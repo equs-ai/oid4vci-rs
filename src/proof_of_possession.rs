@@ -1,14 +1,15 @@
+use async_trait::async_trait;
+use base64::Engine;
 use openidconnect::Nonce;
 use serde::{Deserialize, Serialize};
 use ssi::{
-    did::{Resource, VerificationMethod, DIDURL},
-    did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata},
+    did::{DIDURL, Resource, VerificationMethod},
+    did_resolve::{Content, dereference, DereferencingInputMetadata, DIDResolver},
     jwk::{Algorithm, JWK},
     jws::{self, Header},
     jwt,
 };
 use time::{Duration, OffsetDateTime};
-use url::Url;
 
 const JWS_TYPE: &str = "openid4vci-proof+jwt";
 
@@ -31,10 +32,11 @@ pub enum Proof {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProofOfPossessionBody {
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
-    pub issuer: String,
+    pub issuer: Option<String>,
     #[serde(rename = "aud")]
-    pub audience: Url,
+    pub audience: String,
     #[serde(rename = "nbf")]
     #[serde(
         skip_serializing_if = "Option::is_none",
@@ -49,7 +51,7 @@ pub struct ProofOfPossessionBody {
     pub issued_at: Option<OffsetDateTime>,
     #[serde(rename = "exp", with = "time::serde::timestamp")]
     pub expires_at: OffsetDateTime,
-    #[serde(rename = "jti")]
+    #[serde(rename = "nonce")]
     pub nonce: Nonce,
 }
 
@@ -66,15 +68,15 @@ pub struct ProofOfPossessionController {
 }
 
 pub struct ProofOfPossessionParams {
-    pub audience: Url,
-    pub issuer: String,
+    pub audience: String,
+    pub issuer: Option<String>,
     pub nonce: Option<Nonce>,
     pub controller: ProofOfPossessionController,
 }
 
 pub struct ProofOfPossessionVerificationParams {
-    pub audience: Url,
-    pub issuer: String,
+    pub audience: String,
+    pub issuer: Option<String>,
     pub nonce: Nonce,
     pub controller_did: Option<String>,
     pub controller_jwk: Option<JWK>,
@@ -100,6 +102,8 @@ pub enum VerificationError {
     InvalidJWK,
     #[error("proof of possession DID does not match, expected `{expected}`, found `{actual}`")]
     InvalidDID { actual: String, expected: String },
+    #[error("proof of possession Nonce does not match")]
+    InvalidNonce,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -130,6 +134,11 @@ pub enum ParsingError {
     DIDDereferenceError(#[from] ssi::did::Error),
 }
 
+#[async_trait]
+pub trait Signer: Sync + Send {
+    async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, jws::Error>;
+}
+
 impl ProofOfPossession {
     pub fn generate(params: &ProofOfPossessionParams, expiry: Duration) -> Self {
         let now = OffsetDateTime::now_utc();
@@ -147,7 +156,7 @@ impl ProofOfPossession {
         }
     }
 
-    pub fn to_jwt(&self) -> Result<String, ConversionError> {
+    fn prepare_jwt_parts(&self) -> Result<(String, &JWK, Header), ConversionError> {
         let jwk = &self.controller.jwk;
         let alg = if let Some(a) = jwk.get_algorithm() {
             a
@@ -167,7 +176,27 @@ impl ProofOfPossession {
             type_: Some(JWS_TYPE.to_string()),
             ..Default::default()
         };
+        Ok((payload, jwk, header))
+    }
+
+    pub fn to_jwt(&self) -> Result<String, ConversionError> {
+        let (payload, jwk, header) = self.prepare_jwt_parts()?;
         Ok(jws::encode_sign_custom_header(&payload, jwk, &header)?)
+    }
+
+    pub async fn to_jwt_with_signer<S: Signer>(&self, signer: S) -> Result<String, ConversionError> {
+        let (payload, _, header) = self.prepare_jwt_parts()?;
+
+        let encoder = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+        let h_json = serde_json::to_string(&header)?;
+        let header_b64 = encoder.encode(&h_json);
+        let payload_b64 = encoder.encode(payload);
+        let signing_input = header_b64 + "." + &payload_b64;
+        let signed = signer.sign(signing_input.as_bytes()).await?;
+        let sig_b64 = encoder.encode(signed);
+        let jws = [signing_input, sig_b64].join(".");
+        Ok(jws)
     }
 
     pub async fn from_proof(
@@ -237,16 +266,20 @@ impl ProofOfPossession {
 
         if self.body.issuer != params.issuer {
             return Err(VerificationError::InvalidIssuer {
-                expected: params.issuer.clone(),
-                actual: self.body.issuer.clone(),
+                expected: params.issuer.clone().unwrap_or_default(),
+                actual: self.body.issuer.clone().unwrap_or_default(),
             });
         }
 
         if self.body.audience != params.audience {
             return Err(VerificationError::InvalidAudience {
-                expected: params.audience.to_string(),
-                actual: self.body.audience.to_string(),
+                expected: params.audience.clone(),
+                actual: self.body.audience.clone(),
             });
+        }
+
+        if self.body.nonce != params.nonce {
+            return Err(VerificationError::InvalidNonce);
         }
 
         if let Some(jwk) = &params.controller_jwk {
@@ -297,6 +330,7 @@ mod test {
     use did_jwk::DIDJWK;
     use serde_json::json;
     use ssi::did::{DIDMethod, Source};
+    use ssi::jws::Error;
 
     use super::*;
 
@@ -307,8 +341,8 @@ mod test {
         (
             ProofOfPossession::generate(
                 &ProofOfPossessionParams {
-                    issuer: "test".to_string(),
-                    audience: Url::parse("http://localhost:300").unwrap(),
+                    issuer: Some("test".to_string()),
+                    audience: "http://localhost:300".to_string(),
                     nonce: None,
                     controller: ProofOfPossessionController {
                         jwk,
@@ -336,7 +370,7 @@ mod test {
         pop.verify(&ProofOfPossessionVerificationParams {
             nonce: pop.body.nonce.clone(),
             audience: pop.body.audience.clone(),
-            issuer: "test".to_string(),
+            issuer: Some("test".to_string()),
             controller_did: Some(did),
             controller_jwk: None,
             nbf_tolerance: None,
@@ -344,6 +378,31 @@ mod test {
         })
         .await
         .unwrap();
+    }
+
+    #[tokio::test]
+    async fn basic_with_signer() {
+        let expires_in = Duration::minutes(5);
+
+        let (pop, did) = generate_pop(expires_in);
+
+        let pop_jwt = pop.to_jwt_with_signer(TestSigner { jwk: pop.controller.jwk.clone() }).await.unwrap();
+
+        let pop = ProofOfPossession::from_jwt(&pop_jwt, &DIDJWK)
+            .await
+            .unwrap();
+
+        pop.verify(&ProofOfPossessionVerificationParams {
+            nonce: pop.body.nonce.clone(),
+            audience: pop.body.audience.clone(),
+            issuer: Some("test".to_string()),
+            controller_did: Some(did),
+            controller_jwk: None,
+            nbf_tolerance: None,
+            exp_tolerance: None,
+        })
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
@@ -366,7 +425,7 @@ mod test {
         let mut verification_params = ProofOfPossessionVerificationParams {
             nonce: pop.body.nonce.clone(),
             audience: pop.body.audience.clone(),
-            issuer: "test".to_string(),
+            issuer: Some("test".to_string()),
             controller_did: Some(did),
             controller_jwk: None,
             nbf_tolerance: None,
@@ -400,7 +459,7 @@ mod test {
         let mut verification_params = ProofOfPossessionVerificationParams {
             nonce: pop.body.nonce.clone(),
             audience: pop.body.audience.clone(),
-            issuer: "test".to_string(),
+            issuer: Some("test".to_string()),
             controller_did: Some(did),
             controller_jwk: None,
             nbf_tolerance: None,
@@ -416,5 +475,16 @@ mod test {
         pop.verify(&verification_params)
             .await
             .expect("should have passed with exp tolerance");
+    }
+
+    struct TestSigner {
+        jwk: JWK,
+    }
+
+    #[async_trait]
+    impl Signer for TestSigner {
+        async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
+            jws::sign_bytes(self.jwk.get_algorithm().unwrap(), data, &self.jwk)
+        }
     }
 }
