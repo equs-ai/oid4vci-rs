@@ -1,6 +1,6 @@
 #![allow(clippy::type_complexity)]
 use std::{future::Future, marker::PhantomData};
-
+use std::collections::HashMap;
 use oauth2::{
     http::{header::ACCEPT, HeaderValue, Method, StatusCode},
     AuthUrl, HttpRequest, HttpResponse, TokenUrl,
@@ -28,7 +28,7 @@ use crate::{
 pub use crate::types::{BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, ParUrl};
 
 const METADATA_URL_SUFFIX: &str = ".well-known/openid-credential-issuer";
-const AUTHORIZATION_METADATA_URL_SUFFIX: &str = ".well-known/oauth-authorization-server";
+const AUTHORIZATION_METADATA_URL_SUFFIX: &str = ".well-known/openid-configuration";
 
 #[serde_as]
 #[skip_serializing_none]
@@ -41,7 +41,7 @@ where
     JA: JweKeyManagementAlgorithm + Clone,
 {
     credential_issuer: IssuerUrl,
-    authorization_server: Option<IssuerUrl>, // Not sure this is the right type
+    authorization_servers: Option<Vec<IssuerUrl>>, // Not sure this is the right type
     credential_endpoint: CredentialUrl,
     batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
@@ -51,8 +51,8 @@ where
     credential_response_encryption_enc_values_supported: Option<Vec<JE>>,
     require_credential_response_encryption: Option<bool>,
     #[serde(bound = "CM: CredentialMetadataProfile")]
-    credentials_supported: Vec<CredentialMetadata<CM>>,
-    display: Option<IssuerMetadataDisplay>,
+    credential_configurations_supported: HashMap<String, CredentialMetadata<CM>>,
+    display: Option<Vec<IssuerMetadataDisplay>>,
     #[serde(skip)]
     _phantom_jt: PhantomData<JT>,
 }
@@ -67,18 +67,18 @@ where
     pub fn new(
         credential_issuer: IssuerUrl,
         credential_endpoint: CredentialUrl,
-        credentials_supported: Vec<CredentialMetadata<CM>>,
+        credential_configurations_supported: HashMap<String, CredentialMetadata<CM>>,
     ) -> Self {
         Self {
             credential_issuer,
-            authorization_server: None,
+            authorization_servers: None,
             credential_endpoint,
             batch_credential_endpoint: None,
             deferred_credential_endpoint: None,
             credential_response_encryption_alg_values_supported: None,
             credential_response_encryption_enc_values_supported: None,
             require_credential_response_encryption: None,
-            credentials_supported,
+            credential_configurations_supported,
             display: None,
             _phantom_jt: PhantomData,
         }
@@ -87,15 +87,15 @@ where
     field_getters_setters![
         pub self [self] ["issuer metadata value"] {
             set_credential_issuer -> credential_issuer[IssuerUrl],
-            set_authorization_server -> authorization_server[Option<IssuerUrl>],
+            set_authorization_servers -> authorization_servers[Option<Vec<IssuerUrl>>],
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
             set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
             set_credential_response_encryption_alg_values_supported -> credential_response_encryption_alg_values_supported[Option<Vec<JA>>],
             set_credential_response_encryption_enc_values_supported -> credential_response_encryption_enc_values_supported[Option<Vec<JE>>],
             set_require_credential_response_encryption -> require_credential_response_encryption[Option<bool>],
-            set_credentials_supported -> credentials_supported[Vec<CredentialMetadata<CM>>],
-            set_display -> display[Option<IssuerMetadataDisplay>],
+            set_credential_configurations_supported -> credential_configurations_supported[HashMap<String, CredentialMetadata<CM>>],
+            set_display -> display[Option<Vec<IssuerMetadataDisplay>>],
         }
     ];
 
@@ -201,7 +201,7 @@ where
 {
     scope: Option<Scope>,
     cryptographic_binding_methods_supported: Option<Vec<CryptographicBindingMethod>>,
-    proof_types_supported: Option<Vec<KeyProofType>>,
+    proof_types_supported: Option<HashMap<KeyProofType, serde_json::Value>>,
     display: Option<Vec<CredentialMetadataDisplay>>,
     #[serde(bound = "CM: CredentialMetadataProfile")]
     #[serde(flatten)]
@@ -237,7 +237,7 @@ where
         pub self [self] ["credential metadata value"] {
             set_scope -> scope[Option<Scope>],
             set_cryptographic_binding_methods_supported -> cryptographic_binding_methods_supported[Option<Vec<CryptographicBindingMethod>>],
-            set_proof_types_suuported -> proof_types_supported[Option<Vec<KeyProofType>>],
+            set_proof_types_suuported -> proof_types_supported[Option<HashMap<KeyProofType, serde_json::Value>>],
             set_display -> display[Option<Vec<CredentialMetadataDisplay>>],
             set_additional_fields -> additional_fields[CM],
         }
@@ -362,8 +362,10 @@ impl AuthorizationMetadata {
         JA: JweKeyManagementAlgorithm + Clone,
     {
         let issuer_url = issuer_metadata
-            .authorization_server
+            .authorization_servers
             .clone()
+            .map(|vec| vec.into_iter().next())
+            .flatten()
             .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
@@ -388,8 +390,10 @@ impl AuthorizationMetadata {
         JA: JweKeyManagementAlgorithm + Clone,
     {
         let issuer_url = issuer_metadata
-            .authorization_server
+            .authorization_servers
             .clone()
+            .map(|vec| vec.into_iter().next())
+            .flatten()
             .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
@@ -519,9 +523,13 @@ mod test {
                     }
                 }
             },
-            "proof_types_supported": [
-                "jwt"
-            ],
+            "proof_types_supported": {
+                "jwt": {
+                    "proof_signing_alg_values_supported": [
+                        "ES256"
+                    ]
+                }
+            },
             "display": [
                 {
                     "name": "University Credential",
@@ -671,5 +679,104 @@ mod test {
         }
         }))
         .unwrap();
+    }
+
+    #[test]
+    fn example_metadata() {
+        let _: IssuerMetadata<
+            CoreProfilesMetadata,
+            CoreJsonWebKeyType,
+            CoreJweContentEncryptionAlgorithm,
+            CoreJweKeyManagementAlgorithm
+        > = serde_json::from_value(json!({
+                "credential_issuer": "https://credential-issuer.example.com",
+                "authorization_servers": [ "https://server.example.com" ],
+                "credential_endpoint": "https://credential-issuer.example.com",
+                "batch_credential_endpoint": "https://credential-issuer.example.com/batch_credential",
+                "deferred_credential_endpoint": "https://credential-issuer.example.com/deferred_credential",
+                "credential_response_encryption": {
+                    "alg_values_supported" : [
+                        "ECDH-ES"
+                    ],
+                    "enc_values_supported" : [
+                        "A128GCM"
+                    ],
+                    "encryption_required": false
+                },
+                "display": [
+                    {
+                        "name": "Example University",
+                        "locale": "en-US"
+                    },
+                    {
+                        "name": "Example Université",
+                        "locale": "fr-FR"
+                    }
+                ],
+                "credential_configurations_supported": {
+                    "UniversityDegreeCredential": {
+                        "format": "jwt_vc_json",
+                        "scope": "UniversityDegree",
+                        "cryptographic_binding_methods_supported": [
+                            "did:example"
+                        ],
+                        "credential_signing_alg_values_supported": [
+                            "ES256"
+                        ],
+                        "credential_definition":{
+                            "type": [
+                                "VerifiableCredential",
+                                "UniversityDegreeCredential"
+                            ],
+                            "credentialSubject": {
+                                "given_name": {
+                                    "display": [
+                                        {
+                                            "name": "Given Name",
+                                            "locale": "en-US"
+                                        }
+                                    ]
+                                },
+                                "family_name": {
+                                    "display": [
+                                        {
+                                            "name": "Surname",
+                                            "locale": "en-US"
+                                        }
+                                    ]
+                                },
+                                "degree": {},
+                                "gpa": {
+                                    "display": [
+                                        {
+                                            "name": "GPA"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "proof_types_supported": {
+                            "jwt": {
+                                "proof_signing_alg_values_supported": [
+                                    "ES256"
+                                ]
+                            }
+                        },
+                        "display": [
+                            {
+                                "name": "University Credential",
+                                "locale": "en-US",
+                                "logo": {
+                                    "url": "https://university.example.edu/public/logo.png",
+                                    "alt_text": "a square logo of a university"
+                                },
+                                "background_color": "#12107c",
+                                "text_color": "#FFFFFF"
+                            }
+                        ]
+                    }
+                }
+            }))
+            .unwrap();
     }
 }

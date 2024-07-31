@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use oauth2::{
@@ -59,8 +60,8 @@ where
     credential_response_encryption_alg_values_supported: Option<Vec<JA>>,
     credential_response_encryption_enc_values_supported: Option<Vec<JE>>,
     require_credential_response_encryption: Option<bool>,
-    credentials_supported: Vec<CredentialMetadata<C::Metadata>>,
-    display: Option<IssuerMetadataDisplay>,
+    credential_configurations_supported: HashMap<String, CredentialMetadata<C::Metadata>>,
+    display: Option<Vec<IssuerMetadataDisplay>>,
     _phantom_jt: PhantomData<JT>,
 }
 
@@ -92,7 +93,7 @@ where
             credential_response_encryption_alg_values_supported: None,
             credential_response_encryption_enc_values_supported: None,
             require_credential_response_encryption: None,
-            credentials_supported: vec![],
+            credential_configurations_supported: HashMap::new(),
             display: None,
             _phantom_jt: PhantomData,
         }
@@ -107,8 +108,8 @@ where
             set_credential_response_encryption_alg_values_supported -> credential_response_encryption_alg_values_supported[Option<Vec<JA>>],
             set_credential_response_encryption_enc_values_supported -> credential_response_encryption_enc_values_supported[Option<Vec<JE>>],
             set_require_credential_response_encryption -> require_credential_response_encryption[Option<bool>],
-            set_credentials_supported -> credentials_supported[Vec<CredentialMetadata<C::Metadata>>],
-            set_display -> display[Option<IssuerMetadataDisplay>],
+            set_credential_configurations_supported -> credential_configurations_supported[HashMap<String, CredentialMetadata<C::Metadata>>],
+            set_display -> display[Option<Vec<IssuerMetadataDisplay>>],
         }
     ];
 
@@ -144,7 +145,7 @@ where
         .set_require_credential_response_encryption(
             issuer_metadata.require_credential_response_encryption(),
         )
-        .set_credentials_supported(issuer_metadata.credentials_supported().clone())
+        .set_credential_configurations_supported(issuer_metadata.credential_configurations_supported().clone())
         .set_display(issuer_metadata.display().cloned())
     }
 

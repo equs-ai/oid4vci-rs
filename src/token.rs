@@ -6,6 +6,9 @@ use openidconnect::{
     ClientId, Nonce, RedirectUrl, StandardErrorResponse, StandardTokenResponse,
 };
 use serde::{Deserialize, Serialize};
+use crate::authorization::AuthorizationDetail;
+use crate::core::profiles::CoreProfilesAuthorizationDetails;
+use crate::profiles::AuthorizationDetaislProfile;
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case", tag = "grant_type")]
@@ -20,8 +23,7 @@ pub enum Request {
         client_id: Option<ClientId>,
         #[serde(rename = "pre-authorized_code")]
         pre_authorized_code: String,
-        #[serde(alias = "pin")]
-        user_pin: Option<String>,
+        tx_code: Option<String>,
     },
     #[serde(rename = "urn:ietf:params:oauth:grant-type:refresh_token")]
     RefreshToken {
@@ -33,7 +35,10 @@ pub enum Request {
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
-pub struct ExtraResponseTokenFields {
+pub struct ExtraResponseTokenFields<AD>
+where
+    AD: AuthorizationDetaislProfile,
+{
     #[serde(skip_serializing_if = "Option::is_none")]
     pub c_nonce: Option<Nonce>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -42,9 +47,13 @@ pub struct ExtraResponseTokenFields {
     pub authorization_pending: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<Duration>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(bound = "AD: AuthorizationDetaislProfile")]
+    pub authorization_details: Option<AuthorizationDetail<AD>>,
+
 }
 
-pub type Response = StandardTokenResponse<ExtraResponseTokenFields, CoreTokenType>;
+pub type Response = StandardTokenResponse<ExtraResponseTokenFields<CoreProfilesAuthorizationDetails>, CoreTokenType>;
 pub type Error = StandardErrorResponse<CoreErrorResponseType>;
 
-impl openidconnect::ExtraTokenFields for ExtraResponseTokenFields {}
+impl openidconnect::ExtraTokenFields for ExtraResponseTokenFields<CoreProfilesAuthorizationDetails> {}
