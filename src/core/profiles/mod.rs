@@ -47,6 +47,18 @@ impl CredentialMetadataProfile for CoreProfilesMetadata {
     }
 }
 
+impl CoreProfilesMetadata {
+    pub fn format_as_string(&self) -> String {
+        match self {
+            CoreProfilesMetadata::SDJWTVC(_) => { "vc+sd-jwt".to_string() }
+            CoreProfilesMetadata::JWTVC(_) => { "jwt_vc_json".to_string() }
+            CoreProfilesMetadata::JWTLDVC(_) => { "jwt_vc_json-ld".to_string() }
+            CoreProfilesMetadata::LDVC(_) => {" ldp_vc".to_string() }
+            CoreProfilesMetadata::ISOmDL(_) => { "mso_mdoc".to_string() }
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesOffer {

@@ -51,7 +51,7 @@ pub struct ProofOfPossessionBody {
     pub issued_at: Option<OffsetDateTime>,
     #[serde(rename = "exp", with = "time::serde::timestamp")]
     pub expires_at: OffsetDateTime,
-    #[serde(rename = "nonce")]
+    #[serde(rename = "jti")]
     pub nonce: Nonce,
 }
 

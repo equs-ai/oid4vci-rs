@@ -1,11 +1,11 @@
 use std::{future::Future, marker::PhantomData};
 
 use oauth2::{
+    AccessToken,
     http::{
         header::{ACCEPT, CONTENT_TYPE},
         HeaderValue, Method, StatusCode,
-    },
-    AccessToken, HttpRequest, HttpResponse, StandardErrorResponse,
+    }, HttpRequest, HttpResponse, StandardErrorResponse,
 };
 use openidconnect::{
     ClaimsVerificationError, ErrorResponseType, JsonWebKeyType, JweContentEncryptionAlgorithm,
@@ -29,14 +29,28 @@ where
     JE: JweContentEncryptionAlgorithm<JT>,
     JA: JweKeyManagementAlgorithm,
 {
+    pub credential_identifier: Option<String>,
     #[serde(flatten, bound = "CR: CredentialRequestProfile")]
     additional_profile_fields: CR,
     proof: Option<Proof>,
-    credential_encryption_jwk: Option<JWK>,
-    #[serde(bound = "JA: JweKeyManagementAlgorithm")]
-    credential_response_encryption_alg: Option<JA>,
     #[serde(bound = "JE: JweContentEncryptionAlgorithm<JT>")]
-    credential_response_encryption_enc: Option<JE>,
+    credential_response_encryption: Option<CredentialResponseEncryption<JT, JE, JA>>,
+    #[serde(skip)]
+    _phantom_jt: PhantomData<JT>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct CredentialResponseEncryption<JT, JE, JA>
+where
+    JT: JsonWebKeyType,
+    JE: JweContentEncryptionAlgorithm<JT>,
+    JA: JweKeyManagementAlgorithm,
+{
+    jwk: Option<JWK>,
+    #[serde(bound = "JA: JweKeyManagementAlgorithm")]
+    alg: Option<JA>,
+    #[serde(bound = "JE: JweContentEncryptionAlgorithm<JT>")]
+    enc: Option<JE>,
     #[serde(skip)]
     _phantom_jt: PhantomData<JT>,
 }
@@ -50,11 +64,10 @@ where
 {
     pub(crate) fn new(additional_profile_fields: CR) -> Self {
         Self {
+            credential_identifier: None,
             additional_profile_fields,
             proof: None,
-            credential_encryption_jwk: None,
-            credential_response_encryption_alg: None,
-            credential_response_encryption_enc: None,
+            credential_response_encryption: None,
             _phantom_jt: PhantomData,
         }
     }
@@ -63,9 +76,8 @@ where
         pub self [self] ["credential request value"] {
             set_additional_profile_fields -> additional_profile_fields[CR],
             set_proof -> proof[Option<Proof>],
-            set_credential_encryption_jwk -> credential_encryption_jwk[Option<JWK>],
-            set_credential_response_encryption_alg -> credential_response_encryption_alg[Option<JA>],
-            set_credential_response_encryption_enc -> credential_response_encryption_enc[Option<JE>],
+            set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption<JT,JE,JA>> ],
+            set_credential_identifier -> credential_identifier[Option<String> ],
         }
     ];
 }
@@ -105,9 +117,7 @@ where
         pub self [self.body] ["credential request value"] {
             set_additional_profile_fields -> additional_profile_fields[CR],
             set_proof -> proof[Option<Proof>],
-            set_credential_encryption_jwk -> credential_encryption_jwk[Option<JWK>],
-            set_credential_response_encryption_alg -> credential_response_encryption_alg[Option<JA>],
-            set_credential_response_encryption_enc -> credential_response_encryption_enc[Option<JE>],
+            set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption<JT,JE,JA>> ],
         }
     ];
 
@@ -169,6 +179,11 @@ where
     {
         // TODO status 202 if deferred
         if http_response.status_code != StatusCode::OK {
+            if let Ok(pop_required) = serde_path_to_error::deserialize
+                (&mut serde_json::Deserializer::from_slice(&http_response.body)) {
+                return Err(RequestError::ProofVerification(pop_required));
+            }
+
             return Err(RequestError::Response(
                 http_response.status_code,
                 http_response.body,
@@ -211,8 +226,18 @@ where
     Request(#[source] RE),
     #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
+    #[error("ProofVerification error")]
+    ProofVerification(ProofVerificationErrorBody),
     #[error("Other error: {0}")]
     Other(String),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ProofVerificationErrorBody {
+    pub error: String,
+    pub error_description: String,
+    pub c_nonce: Option<Nonce>,
+    pub c_nonce_expires_in: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -224,6 +249,7 @@ where
     additional_profile_fields: ResponseEnum<CR>,
     c_nonce: Option<Nonce>,
     c_nonce_expires_in: Option<i64>,
+    notification_id: Option<String>,
 }
 
 impl<CR> Response<CR>
@@ -235,6 +261,7 @@ where
             additional_profile_fields,
             c_nonce: None,
             c_nonce_expires_in: None,
+            notification_id: None,
         }
     }
     field_getters_setters![
@@ -242,6 +269,7 @@ where
             set_additional_profile_fields -> additional_profile_fields[ResponseEnum<CR>],
             set_nonce -> c_nonce[Option<Nonce>],
             set_nonce_expiration -> c_nonce_expires_in[Option<i64>],
+            set_notification_id -> notification_id[Option<String>],
         }
     ];
 }

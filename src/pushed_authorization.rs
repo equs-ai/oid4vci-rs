@@ -44,7 +44,7 @@ pub struct ParAuthParams {
     code_challenge_method: PkceCodeChallengeMethod,
     redirect_uri: RedirectUrl,
     #[serde(skip_serializing_if = "Option::is_none")]
-    response_type: Option<String>,
+    response_type: Option<ResponseType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     client_assertion: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -69,7 +69,7 @@ impl ParAuthParams {
             set_code_challenge -> code_challenge[String],
             set_code_challenge_method -> code_challenge_method[PkceCodeChallengeMethod],
             set_redirect_uri -> redirect_uri[RedirectUrl],
-            set_response_type -> response_type[Option<String>],
+            set_response_type -> response_type[Option<ResponseType>],
             set_client_assertion -> client_assertion[Option<String>],
             set_client_assertion_type -> client_assertion_type[Option<String>],
             set_authorization_details -> authorization_details[Option<String>],
@@ -252,8 +252,8 @@ where
         self
     }
 
-    pub fn set_response_type(mut self, response_type: ResponseType) -> Self {
-        self.inner = self.inner.set_response_type(&response_type);
+    pub fn set_response_type(mut self, response_type: &ResponseType) -> Self {
+        self.inner = self.inner.set_response_type(response_type);
         self
     }
 
@@ -307,7 +307,7 @@ mod test {
             .unwrap()
             .set_pkce_challenge(pkce_challenge)
             .set_scope(Scope::new("vc+sd-jwt".to_owned()))
-            .set_response_type(ResponseType::new("code".to_owned()))
+            .set_response_type(&ResponseType::new("code".to_owned()))
             .prepare_request::<HttpClientError>(None, None)
             .unwrap();
         assert_json_eq!(expected_body, body);

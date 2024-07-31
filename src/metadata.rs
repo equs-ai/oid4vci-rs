@@ -1,18 +1,17 @@
 #![allow(clippy::type_complexity)]
+
 use std::{future::Future, marker::PhantomData};
 use std::collections::HashMap;
-use oauth2::{
-    http::{header::ACCEPT, HeaderValue, Method, StatusCode},
-    AuthUrl, HttpRequest, HttpResponse, TokenUrl,
-};
+
+use oauth2::{AuthUrl, http::{header::ACCEPT, HeaderValue, Method, StatusCode}, HttpRequest, HttpResponse, TokenUrl};
 use openidconnect::{
+    AdditionalProviderMetadata,
     core::{
         CoreAuthDisplay, CoreClaimName, CoreClaimType, CoreClientAuthMethod, CoreGrantType,
         CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseMode, CoreResponseType,
         CoreSubjectIdentifierType,
-    },
-    AdditionalProviderMetadata, DiscoveryError, IssuerUrl, JsonWebKeySetUrl, JsonWebKeyType,
+    }, DiscoveryError, IssuerUrl, JsonWebKeySetUrl, JsonWebKeyType,
     JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, LanguageTag, LogoUrl,
     ProviderMetadata, ResponseTypes, Scope,
 };
@@ -24,8 +23,7 @@ use crate::{
     profiles::CredentialMetadataProfile,
     proof_of_possession::KeyProofType,
 };
-
-pub use crate::types::{BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, ParUrl};
+pub use crate::types::{BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, NotificationtUrl, ParUrl, TokenIntorspectUrl};
 
 const METADATA_URL_SUFFIX: &str = ".well-known/openid-credential-issuer";
 const AUTHORIZATION_METADATA_URL_SUFFIX: &str = ".well-known/openid-configuration";
@@ -45,6 +43,7 @@ where
     credential_endpoint: CredentialUrl,
     batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
+    notification_endpoint: Option<NotificationtUrl>,
     #[serde(bound = "JA: JweKeyManagementAlgorithm")]
     credential_response_encryption_alg_values_supported: Option<Vec<JA>>,
     #[serde(bound = "JE: JweContentEncryptionAlgorithm<JT>")]
@@ -75,6 +74,7 @@ where
             credential_endpoint,
             batch_credential_endpoint: None,
             deferred_credential_endpoint: None,
+            notification_endpoint: None,
             credential_response_encryption_alg_values_supported: None,
             credential_response_encryption_enc_values_supported: None,
             require_credential_response_encryption: None,
@@ -91,6 +91,7 @@ where
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
             set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
+            set_notification_endpoint -> notification_endpoint[Option<NotificationtUrl>],
             set_credential_response_encryption_alg_values_supported -> credential_response_encryption_alg_values_supported[Option<Vec<JA>>],
             set_credential_response_encryption_enc_values_supported -> credential_response_encryption_enc_values_supported[Option<Vec<JE>>],
             set_require_credential_response_encryption -> require_credential_response_encryption[Option<bool>],
@@ -281,6 +282,7 @@ pub struct AdditionalOAuthMetadata {
     pre_authorized_grant_anonymous_access_supported: Option<bool>,
     pushed_authorization_request_endpoint: Option<ParUrl>,
     require_pushed_authorization_requests: Option<bool>,
+    token_introspection_url: Option<TokenIntorspectUrl>,
 }
 
 impl AdditionalOAuthMetadata {
@@ -350,7 +352,7 @@ impl AuthorizationMetadata {
         )
     }
     pub fn discover<HC, RE, CM, JT, JE, JA>(
-        issuer_metadata: &IssuerMetadata<CM, JT, JE, JA>,
+        issuer_url: IssuerUrl,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -361,12 +363,6 @@ impl AuthorizationMetadata {
         JE: JweContentEncryptionAlgorithm<JT>,
         JA: JweKeyManagementAlgorithm + Clone,
     {
-        let issuer_url = issuer_metadata
-            .authorization_servers
-            .clone()
-            .map(|vec| vec.into_iter().next())
-            .flatten()
-            .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
@@ -377,11 +373,11 @@ impl AuthorizationMetadata {
     }
 
     pub async fn discover_async<F, HC, RE, CM, JT, JE, JA>(
-        issuer_metadata: &IssuerMetadata<CM, JT, JE, JA>,
+        issuer_url: IssuerUrl,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        F: Future<Output = Result<HttpResponse, RE>>,
+        F: Future<Output=Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
         RE: std::error::Error + 'static,
         CM: CredentialMetadataProfile,
@@ -389,12 +385,6 @@ impl AuthorizationMetadata {
         JE: JweContentEncryptionAlgorithm<JT>,
         JA: JweKeyManagementAlgorithm + Clone,
     {
-        let issuer_url = issuer_metadata
-            .authorization_servers
-            .clone()
-            .map(|vec| vec.into_iter().next())
-            .flatten()
-            .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
