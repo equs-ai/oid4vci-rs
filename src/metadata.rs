@@ -352,7 +352,7 @@ impl AuthorizationMetadata {
         )
     }
     pub fn discover<HC, RE, CM, JT, JE, JA>(
-        issuer_url: IssuerUrl,
+        issuer_metadata: &IssuerMetadata<CM, JT, JE, JA>,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -363,6 +363,12 @@ impl AuthorizationMetadata {
         JE: JweContentEncryptionAlgorithm<JT>,
         JA: JweKeyManagementAlgorithm + Clone,
     {
+        let issuer_url = issuer_metadata
+            .authorization_servers
+            .clone()
+            .map(|vec| vec.into_iter().next())
+            .flatten()
+            .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
@@ -373,11 +379,11 @@ impl AuthorizationMetadata {
     }
 
     pub async fn discover_async<F, HC, RE, CM, JT, JE, JA>(
-        issuer_url: IssuerUrl,
+        issuer_metadata: &IssuerMetadata<CM, JT, JE, JA>,
         http_client: HC,
     ) -> Result<Self, DiscoveryError<RE>>
     where
-        F: Future<Output=Result<HttpResponse, RE>>,
+        F: Future<Output = Result<HttpResponse, RE>>,
         HC: Fn(HttpRequest) -> F + 'static,
         RE: std::error::Error + 'static,
         CM: CredentialMetadataProfile,
@@ -385,6 +391,12 @@ impl AuthorizationMetadata {
         JE: JweContentEncryptionAlgorithm<JT>,
         JA: JweKeyManagementAlgorithm + Clone,
     {
+        let issuer_url = issuer_metadata
+            .authorization_servers
+            .clone()
+            .map(|vec| vec.into_iter().next())
+            .flatten()
+            .unwrap_or(issuer_metadata.credential_issuer.clone());
         let discovery_url = issuer_url
             .join(AUTHORIZATION_METADATA_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
