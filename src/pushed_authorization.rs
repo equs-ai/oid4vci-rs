@@ -7,14 +7,10 @@ use crate::{
     profiles::AuthorizationDetaislProfile,
     types::ParUrl,
 };
-use oauth2::{
-    http::{
-        header::{ACCEPT, CONTENT_TYPE},
-        HeaderValue, Method, StatusCode,
-    },
-    AuthUrl, ClientId, CsrfToken, HttpRequest, HttpResponse, PkceCodeChallenge,
-    PkceCodeChallengeMethod, RedirectUrl,
-};
+use oauth2::{http::{
+    header::{ACCEPT, CONTENT_TYPE},
+    HeaderValue, Method, StatusCode,
+}, AuthUrl, ClientId, CsrfToken, HttpRequest, HttpResponse, PkceCodeChallenge, PkceCodeChallengeMethod, RedirectUrl, Scope, ResponseType};
 use openidconnect::{core::CoreErrorResponseType, IssuerUrl, Nonce, StandardErrorResponse};
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +57,8 @@ pub struct ParAuthParams {
     user_hint: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     issuer_state: Option<CsrfToken>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scope: Option<Scope>,
 }
 
 impl ParAuthParams {
@@ -78,6 +76,7 @@ impl ParAuthParams {
             set_wallet_issuer -> wallet_issuer[Option<IssuerUrl>],
             set_user_hint -> user_hint[Option<String>],
             set_issuer_state -> issuer_state[Option<CsrfToken>],
+            set_scope -> scope[Option<Scope>],
         }
     ];
 }
@@ -145,7 +144,7 @@ where
             .await
             .map_err(RequestError::Request)?;
 
-        if http_response.status_code != StatusCode::OK {
+        if http_response.status_code != StatusCode::CREATED {
             return Err(RequestError::Response(
                 http_response.status_code,
                 http_response.body,
@@ -193,7 +192,8 @@ where
     {
         let (url, token) = self.inner.url();
 
-        let body = serde_urlencoded::from_str::<ParAuthParams>(url.clone().as_str())
+        let params = url.query().ok_or(RequestError::Other("failed parsing query parameters".to_string()))?;
+        let body = serde_urlencoded::from_str::<ParAuthParams>(params)
             .map_err(|_| RequestError::Other("failed parsing url".to_string()))?
             .set_client_assertion_type(client_assertion_type.clone())
             .set_client_assertion(client_assertion.clone())
@@ -246,6 +246,17 @@ where
         self.authorization_details = authorization_details;
         self
     }
+
+    pub fn set_scope(mut self, scope: Scope) -> Self {
+        self.inner = self.inner.add_scope(scope);
+        self
+    }
+
+    pub fn set_response_type(mut self, response_type: ResponseType) -> Self {
+        self.inner = self.inner.set_response_type(&response_type);
+        self
+    }
+
 }
 
 #[cfg(test)]
@@ -270,6 +281,9 @@ mod test {
             "code_challenge_method": "S256",
             "redirect_uri": "https://client.example.org/cb",
 
+            "scope": "vc+sd-jwt",
+            "response_type": "code",
+
             "authorization_details": "[]",
         });
 
@@ -292,6 +306,8 @@ mod test {
             .pushed_authorization_request::<_, CoreProfilesAuthorizationDetails>(move || state)
             .unwrap()
             .set_pkce_challenge(pkce_challenge)
+            .set_scope(Scope::new("vc+sd-jwt".to_owned()))
+            .set_response_type(ResponseType::new("code".to_owned()))
             .prepare_request::<HttpClientError>(None, None)
             .unwrap();
         assert_json_eq!(expected_body, body);

@@ -13,7 +13,7 @@ use time::{Duration, OffsetDateTime};
 
 const JWS_TYPE: &str = "openid4vci-proof+jwt";
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash, Eq)]
 pub enum KeyProofType {
     #[serde(rename = "jwt")]
     Jwt,

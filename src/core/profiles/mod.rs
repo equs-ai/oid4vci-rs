@@ -9,6 +9,7 @@ use crate::profiles::{
 
 pub mod isomdl;
 pub mod w3c;
+pub mod sd_jwt;
 
 pub struct CoreProfiles {}
 impl Profile for CoreProfiles {
@@ -21,6 +22,8 @@ impl Profile for CoreProfiles {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesMetadata {
+    #[serde(rename = "vc+sd-jwt")]
+    SDJWTVC(sd_jwt::Metadata),
     #[serde(rename = "jwt_vc_json")]
     JWTVC(w3c::jwt::Metadata),
     #[serde(rename = "jwt_vc_json-ld")]
@@ -35,6 +38,7 @@ impl CredentialMetadataProfile for CoreProfilesMetadata {
 
     fn to_request(&self) -> Self::Request {
         match self {
+            CoreProfilesMetadata::SDJWTVC(m) => Self::Request::SDJWTVC(m.to_request()),
             CoreProfilesMetadata::JWTVC(m) => Self::Request::JWTVC(m.to_request()),
             CoreProfilesMetadata::JWTLDVC(m) => Self::Request::JWTLDVC(m.to_request()),
             CoreProfilesMetadata::LDVC(m) => Self::Request::LDVC(m.to_request()),
@@ -46,6 +50,8 @@ impl CredentialMetadataProfile for CoreProfilesMetadata {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesOffer {
+    #[serde(rename = "vc+sd-jwt")]
+    SDJWTVC(sd_jwt::Offer),
     #[serde(rename = "jwt_vc_json")]
     JWTVC(w3c::jwt::Offer),
     #[serde(rename = "jwt_vc_json-ld")]
@@ -60,6 +66,8 @@ impl CredentialOfferProfile for CoreProfilesOffer {}
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesAuthorizationDetails {
+    #[serde(rename = "vc+sd-jwt")]
+    SDJWTVC(sd_jwt::AuthorizationDetails),
     #[serde(rename = "jwt_vc_json")]
     JWTVC(w3c::jwt::AuthorizationDetails),
     #[serde(rename = "jwt_vc_json-ld")]
@@ -74,6 +82,8 @@ impl AuthorizationDetaislProfile for CoreProfilesAuthorizationDetails {}
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesRequest {
+    #[serde(rename = "vc+sd-jwt")]
+    SDJWTVC(sd_jwt::Request),
     #[serde(rename = "jwt_vc_json")]
     JWTVC(w3c::jwt::Request),
     #[serde(rename = "jwt_vc_json-ld")]
@@ -90,6 +100,8 @@ impl CredentialRequestProfile for CoreProfilesRequest {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "format")]
 pub enum CoreProfilesResponse {
+    #[serde(rename = "vc+sd-jwt")]
+    SDJWTVC(sd_jwt::Response),
     #[serde(rename = "jwt_vc_json")]
     JWTVC(w3c::jwt::Response),
     #[serde(rename = "jwt_vc_json-ld")]
