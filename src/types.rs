@@ -271,6 +271,20 @@ new_url_type![
     ParUrl
 ];
 
+new_url_type![
+    ///
+    /// URL of the Notification endpoint.
+    ///
+    NotificationtUrl
+];
+
+new_url_type![
+    ///
+    /// URL of the Token introspection endpoint.
+    ///
+    TokenIntorspectUrl
+];
+
 new_type![
     ///
     /// String value of a background color of the Credential represented as numerical color values defined in CSS Color Module Level 37 [CSS-Color].

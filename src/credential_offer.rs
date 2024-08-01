@@ -29,8 +29,21 @@ where
 {
     credential_issuer: IssuerUrl,
     #[serde(bound = "CO: CredentialOfferProfile")]
-    credentials: Vec<CredentialOfferFormat<CO>>,
+    credential_configuration_ids: Vec<CredentialOfferFormat<CO>>,
     grants: Option<CredentialOfferGrants>,
+}
+
+impl<CO> CredentialOfferParameters<CO>
+where
+    CO: CredentialOfferProfile,
+{
+    pub fn new(
+        credential_issuer: IssuerUrl,
+        credential_configuration_ids: Vec<CredentialOfferFormat<CO>>,
+        grants: Option<CredentialOfferGrants>,
+    ) -> Self {
+        Self { credential_issuer, credential_configuration_ids, grants }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -48,22 +61,29 @@ where
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CredentialOfferGrants {
-    authorization_code: Option<AuthorizationCodeGrant>,
+    pub authorization_code: Option<AuthorizationCodeGrant>,
     #[serde(rename = "urn:ietf:params:oauth:grant-type:pre-authorized_code")]
-    pre_authorized_code: Option<PreAuthorizationCodeGrant>,
+    pub pre_authorized_code: Option<PreAuthorizationCodeGrant>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuthorizationCodeGrant {
-    issuer_state: Option<CsrfToken>,
+    pub issuer_state: Option<CsrfToken>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PreAuthorizationCodeGrant {
     #[serde(rename = "pre-authorized_code")]
     pre_authorized_code: String,
-    user_pin_required: Option<bool>,
+    tx_code: Option<TransactionCode>,
     interval: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TransactionCode {
+    length: Option<u64>,
+    input_mode: Option<String>,
+    description: Option<String>,
 }
 
 #[cfg(test)]
@@ -78,23 +98,24 @@ mod test {
     fn example_credential_offer_object() {
         let _: CredentialOfferParameters<CoreProfilesOffer> = serde_json::from_value(json!({
            "credential_issuer": "https://credential-issuer.example.com",
-           "credentials": [
-              "UniversityDegree_JWT",
-              {
-                 "format": "mso_mdoc",
-                 "doctype": "org.iso.18013.5.1.mDL"
-              }
-           ],
+            "credential_configuration_ids": [
+                "UniversityDegreeCredential",
+                "org.iso.18013.5.1.mDL"
+              ],
            "grants": {
               "authorization_code": {
                  "issuer_state": "eyJhbGciOiJSU0Et...FYUaBy"
               },
               "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
                  "pre-authorized_code": "adhjhdjajkdkhjhdj",
-                 "user_pin_required": true
-              }
+                  "tx_code": {
+                    "length": 4,
+                    "input_mode": "numeric",
+                    "description": "Please provide the one-time code that was sent via e-mail"
+                  }
+                }
            }
         }))
-        .unwrap();
+            .unwrap();
     }
 }

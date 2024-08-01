@@ -24,7 +24,7 @@ pub mod credential {
 
     use crate::credential;
 
-    use super::profiles::CoreProfilesRequest;
+    use super::profiles::{CoreProfilesRequest, CoreProfilesResponse};
 
     pub type Request = credential::Request<
         CoreProfilesRequest,
@@ -32,6 +32,11 @@ pub mod credential {
         CoreJweContentEncryptionAlgorithm,
         CoreJweKeyManagementAlgorithm,
     >;
+
+    pub type Response = credential::Response<
+        CoreProfilesResponse,
+    >;
+
     pub type BatchRequest = credential::BatchRequest<
         CoreProfilesRequest,
         CoreJsonWebKeyType,
