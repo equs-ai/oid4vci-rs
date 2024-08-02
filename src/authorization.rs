@@ -78,7 +78,7 @@ where
 {
     r#type: AuthorizationDetailType,
     #[serde(flatten, bound = "AD: AuthorizationDetaislProfile")]
-    addition_profile_fields: AD,
+    pub addition_profile_fields: AD,
     #[serde(skip_serializing_if = "Option::is_none")]
     locations: Option<Vec<IssuerUrl>>,
 }

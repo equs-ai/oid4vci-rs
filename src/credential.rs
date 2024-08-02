@@ -32,6 +32,7 @@ where
     pub credential_identifier: Option<String>,
     #[serde(flatten, bound = "CR: CredentialRequestProfile")]
     additional_profile_fields: CR,
+    #[serde(skip_serializing_if = "Option::is_none")]
     proof: Option<Proof>,
     #[serde(bound = "JE: JweContentEncryptionAlgorithm<JT>")]
     credential_response_encryption: Option<CredentialResponseEncryption<JT, JE, JA>>,

@@ -27,10 +27,10 @@ pub struct CredentialOfferParameters<CO>
 where
     CO: CredentialOfferProfile,
 {
-    credential_issuer: IssuerUrl,
+    pub credential_issuer: IssuerUrl,
     #[serde(bound = "CO: CredentialOfferProfile")]
-    credential_configuration_ids: Vec<CredentialOfferFormat<CO>>,
-    grants: Option<CredentialOfferGrants>,
+    pub credential_configuration_ids: Vec<CredentialOfferFormat<CO>>,
+    pub grants: Option<CredentialOfferGrants>,
 }
 
 impl<CO> CredentialOfferParameters<CO>
