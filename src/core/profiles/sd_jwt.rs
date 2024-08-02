@@ -37,19 +37,22 @@ impl CredentialDefinitionSdJwt {
 pub struct Metadata {
     credential_signing_alg_values_supported: Option<Vec<jwk::Algorithm>>,
     credential_definition: CredentialDefinitionSdJwt,
+    vct: Option<String>,
 }
 
 impl Metadata {
     pub fn new(credential_definition: CredentialDefinitionSdJwt) -> Self {
         Self {
             credential_signing_alg_values_supported: None,
+            vct: None,
             credential_definition,
         }
     }
     field_getters_setters![
-        pub self [self] ["JWT VC metadata value"] {
+        pub self [self] ["SD JWT VC metadata value"] {
             set_cryptographic_suites_supported -> credential_signing_alg_values_supported[Option<Vec<jwk::Algorithm>>],
             set_credential_definition -> credential_definition[CredentialDefinitionSdJwt],
+            set_vct -> vct[Option<String>],
         }
     ];
 }
@@ -58,7 +61,7 @@ impl CredentialMetadataProfile for Metadata {
     type Request = Request;
 
     fn to_request(&self) -> Self::Request {
-        Request {}
+        Request::new()
     }
 }
 
@@ -68,8 +71,8 @@ impl CredentialOfferProfile for Offer {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AuthorizationDetails {
-    vct: Option<String>,
-    credential_configuration_id: Option<String>,
+    pub vct: Option<String>,
+    pub credential_configuration_id: Option<String>,
 }
 
 impl AuthorizationDetails {
@@ -80,7 +83,7 @@ impl AuthorizationDetails {
         }
     }
     field_getters_setters![
-        pub self [self] ["JWT VC authorization value"] {
+        pub self [self] ["SD JWT VC authorization value"] {
             set_credential_configuration_id -> credential_configuration_id[Option<String>],
             set_vct -> vct[Option<String>],
         }
@@ -90,7 +93,23 @@ impl AuthorizationDetails {
 impl AuthorizationDetaislProfile for AuthorizationDetails {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Request {}
+pub struct Request {
+    vct: Option<String>,
+}
+
+impl Request {
+    pub fn new() -> Self {
+        Self {
+            vct: None,
+        }
+    }
+
+    field_getters_setters![
+        pub self [self] ["SD JWT VC request value"] {
+            set_vct -> vct[Option<String>],
+        }
+    ];
+}
 
 impl CredentialRequestProfile for Request {
     type Response = Response;

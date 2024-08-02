@@ -70,3 +70,12 @@ pub mod client {
         CoreJweKeyManagementAlgorithm,
     >;
 }
+
+pub mod credential_offer {
+    use crate::core::profiles::CoreProfilesOffer;
+    use crate::credential_offer;
+
+    pub type CredentialOffer = credential_offer::CredentialOffer<
+        CoreProfilesOffer
+    >;
+}

@@ -34,7 +34,7 @@ pub enum Request {
     },
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct ExtraResponseTokenFields<AD>
 where
     AD: AuthorizationDetaislProfile,
@@ -49,7 +49,7 @@ where
     pub interval: Option<Duration>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(bound = "AD: AuthorizationDetaislProfile")]
-    pub authorization_details: Option<AuthorizationDetail<AD>>,
+    pub authorization_details: Option<Vec<AuthorizationDetail<AD>>>,
 
 }
 
