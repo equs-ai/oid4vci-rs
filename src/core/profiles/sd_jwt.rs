@@ -94,7 +94,7 @@ impl AuthorizationDetaislProfile for AuthorizationDetails {}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Request {
-    vct: Option<String>,
+    pub vct: Option<String>,
 }
 
 impl Request {
