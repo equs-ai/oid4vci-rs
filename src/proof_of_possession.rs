@@ -21,6 +21,13 @@ pub enum KeyProofType {
     Cwt,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash, Eq)]
+pub struct ProofType {
+    pub proof_signing_alg_values_supported: Vec<String>,
+    #[serde(flatten)]
+    other: serde_json::Value,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "proof_type")]
 pub enum Proof {

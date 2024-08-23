@@ -23,6 +23,7 @@ use crate::{
     profiles::CredentialMetadataProfile,
     proof_of_possession::KeyProofType,
 };
+use crate::proof_of_possession::ProofType;
 pub use crate::types::{BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, NotificationtUrl, ParUrl, TokenIntorspectUrl};
 
 const METADATA_URL_SUFFIX: &str = ".well-known/openid-credential-issuer";
@@ -202,7 +203,7 @@ where
 {
     scope: Option<Scope>,
     cryptographic_binding_methods_supported: Option<Vec<CryptographicBindingMethod>>,
-    proof_types_supported: Option<HashMap<KeyProofType, serde_json::Value>>,
+    proof_types_supported: Option<HashMap<KeyProofType, ProofType>>,
     display: Option<Vec<CredentialMetadataDisplay>>,
     #[serde(bound = "CM: CredentialMetadataProfile")]
     #[serde(flatten)]
@@ -238,7 +239,7 @@ where
         pub self [self] ["credential metadata value"] {
             set_scope -> scope[Option<Scope>],
             set_cryptographic_binding_methods_supported -> cryptographic_binding_methods_supported[Option<Vec<CryptographicBindingMethod>>],
-            set_proof_types_suuported -> proof_types_supported[Option<HashMap<KeyProofType, serde_json::Value>>],
+            set_proof_types_suuported -> proof_types_supported[Option<HashMap<KeyProofType, ProofType>>],
             set_display -> display[Option<Vec<CredentialMetadataDisplay>>],
             set_additional_fields -> additional_fields[CM],
         }
