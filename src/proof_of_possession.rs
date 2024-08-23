@@ -28,6 +28,22 @@ pub struct ProofType {
     other: serde_json::Value,
 }
 
+impl ProofType {
+
+    pub fn new(proof_signing_alg_values_supported: Vec<String>) -> Self {
+        Self {
+            proof_signing_alg_values_supported,
+            other: serde_json::Value::Null,
+        }
+    }
+
+    field_getters_setters![
+        pub self [self] ["proof type value"] {
+            set_other -> other[serde_json::Value],
+        }
+    ];
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "proof_type")]
 pub enum Proof {
