@@ -143,6 +143,7 @@ mod test {
     #[test]
     fn example_metadata() {
         let _: Metadata = serde_json::from_value(json!({
+            "vct": "https://issuer.com/credential_1",
             "credential_definition": {
                 "type": ["test"],
                 "claims": {
