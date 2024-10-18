@@ -54,6 +54,8 @@ pub struct CredentialSubjectClaims {
     mandatory: Option<bool>,
     value_type: Option<String>,
     display: Option<Vec<IssuerMetadataDisplay>>,
+    #[serde(flatten)]
+    other: serde_json::Value,
 }
 
 impl CredentialSubjectClaims {
@@ -62,6 +64,7 @@ impl CredentialSubjectClaims {
             mandatory: None,
             value_type: None,
             display: None,
+            other: serde_json::Value::Null
         }
     }
 
@@ -70,6 +73,7 @@ impl CredentialSubjectClaims {
             set_mandatory -> mandatory[Option<bool>],
             set_value_type -> value_type[Option<String>],
             set_display -> display[Option<Vec<IssuerMetadataDisplay>>],
+            set_other -> other[serde_json::Value],
         }
     ];
 }
