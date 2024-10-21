@@ -1,57 +1,33 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
-use ssi::jwk;
-
 use crate::core::profiles::w3c::CredentialSubjectClaims;
 use crate::profiles::{
     AuthorizationDetaislProfile, CredentialMetadataProfile, CredentialOfferProfile,
     CredentialRequestProfile, CredentialResponseProfile,
 };
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CredentialDefinitionSdJwt {
-    r#type: serde_json::Value,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    claims: Option<HashMap<String, CredentialSubjectClaims>>,
-}
-
-impl CredentialDefinitionSdJwt {
-    pub fn new(r#type: serde_json::Value) -> Self {
-        Self {
-            r#type,
-            claims: None,
-        }
-    }
-
-    field_getters_setters![
-        pub self [self] ["credential definition value"] {
-            set_type -> r#type[serde_json::Value],
-            set_claims -> claims[Option<HashMap<String, CredentialSubjectClaims>>],
-        }
-    ];
-}
+use serde::{Deserialize, Serialize};
+use ssi::jwk;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Metadata {
     credential_signing_alg_values_supported: Option<Vec<jwk::Algorithm>>,
-    credential_definition: CredentialDefinitionSdJwt,
     vct: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    claims: Option<HashMap<String, CredentialSubjectClaims>>,
 }
 
 impl Metadata {
-    pub fn new(credential_definition: CredentialDefinitionSdJwt, vct: String) -> Self {
+    pub fn new(vct: String) -> Self {
         Self {
-            credential_signing_alg_values_supported: None,
             vct,
-            credential_definition,
+            credential_signing_alg_values_supported: None,
+            claims: None,
         }
     }
     field_getters_setters![
         pub self [self] ["SD JWT VC metadata value"] {
             set_cryptographic_suites_supported -> credential_signing_alg_values_supported[Option<Vec<jwk::Algorithm>>],
-            set_credential_definition -> credential_definition[CredentialDefinitionSdJwt],
+            set_claims -> claims[Option<HashMap<String, CredentialSubjectClaims>>],
         }
     ];
 
@@ -144,34 +120,30 @@ mod test {
     fn example_metadata() {
         let _: Metadata = serde_json::from_value(json!({
             "vct": "https://issuer.com/credential_1",
-            "credential_definition": {
-                "type": ["test"],
-                "claims": {
-                    "address": {
-                      "display": [
-                        {
-                          "locale": "en",
-                          "name": "Resident street_address, country, region, locality and postal_code"
-                        }
-                      ],
-                      "mandatory": false
-                    },
-                    "administrative_number": {
-                      "display": [
-                        {
-                          "locale": "en",
-                          "name": "Alpha-2 country code, representing the nationality of the PID User."
-                        }
-                      ],
-                      "mandatory": false
-                    },
-                  },
-                  "credential_signing_alg_values_supported": [
-                    "ES256"
+            "claims": {
+                "address": {
+                  "display": [
+                    {
+                      "locale": "en",
+                      "name": "Resident street_address, country, region, locality and postal_code"
+                    }
                   ],
-                }
-            }
-        ))
+                  "mandatory": false
+                },
+                "administrative_number": {
+                  "display": [
+                    {
+                      "locale": "en",
+                      "name": "Alpha-2 country code, representing the nationality of the PID User."
+                    }
+                  ],
+                  "mandatory": false
+                },
+              },
+            "credential_signing_alg_values_supported": [
+               "ES256"
+            ],
+        }))
             .unwrap();
     }
 
