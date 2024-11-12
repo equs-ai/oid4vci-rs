@@ -180,9 +180,14 @@ where
     {
         // TODO status 202 if deferred
         if http_response.status_code != StatusCode::OK {
-            if let Ok(pop_required) = serde_path_to_error::deserialize
+            if let Ok(pop_required) = serde_path_to_error::deserialize::<_, ProofVerificationErrorBody>
                 (&mut serde_json::Deserializer::from_slice(&http_response.body)) {
-                return Err(RequestError::ProofVerification(pop_required));
+
+                let result = match pop_required.error {
+                    ErrorType::InvalidToken => RequestError::InvalidToken(pop_required.error_description),
+                    _ => RequestError::ProofVerification(pop_required),
+                };
+                return Err(result);
             }
 
             return Err(RequestError::Response(
@@ -229,13 +234,15 @@ where
     Response(StatusCode, Vec<u8>, String),
     #[error("ProofVerification error")]
     ProofVerification(ProofVerificationErrorBody),
+    #[error("Invalid token: {0}")]
+    InvalidToken(String),
     #[error("Other error: {0}")]
     Other(String),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProofVerificationErrorBody {
-    pub error: String,
+    pub error: ErrorType,
     pub error_description: String,
     pub c_nonce: Option<Nonce>,
     pub c_nonce_expires_in: Option<i64>,
