@@ -180,11 +180,6 @@ where
     {
         // TODO status 202 if deferred
         if http_response.status_code != StatusCode::OK {
-            if let Ok(pop_required) = serde_path_to_error::deserialize
-                (&mut serde_json::Deserializer::from_slice(&http_response.body)) {
-                return Err(RequestError::ProofVerification(pop_required));
-            }
-
             return Err(RequestError::Response(
                 http_response.status_code,
                 http_response.body,
@@ -227,18 +222,8 @@ where
     Request(#[source] RE),
     #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
-    #[error("ProofVerification error")]
-    ProofVerification(ProofVerificationErrorBody),
     #[error("Other error: {0}")]
     Other(String),
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ProofVerificationErrorBody {
-    pub error: String,
-    pub error_description: String,
-    pub c_nonce: Option<Nonce>,
-    pub c_nonce_expires_in: Option<i64>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
