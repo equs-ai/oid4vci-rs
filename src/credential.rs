@@ -227,14 +227,6 @@ where
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ProtocolErrorBody {
-    pub error: ErrorType,
-    pub error_description: String,
-    pub c_nonce: Option<Nonce>,
-    pub c_nonce_expires_in: Option<i64>,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Response<CR>
 where
     CR: CredentialResponseProfile,
