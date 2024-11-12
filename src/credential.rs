@@ -222,8 +222,6 @@ where
     Request(#[source] RE),
     #[error("Server returned invalid response: {2}")]
     Response(StatusCode, Vec<u8>, String),
-    #[error("Protocol error")]
-    Protocol(ProtocolErrorBody),
     #[error("Other error: {0}")]
     Other(String),
 }
