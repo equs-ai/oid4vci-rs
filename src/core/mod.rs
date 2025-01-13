@@ -1,81 +1,38 @@
 pub mod profiles;
 
 pub mod metadata {
-    use openidconnect::core::{
-        CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
-    };
-
     use crate::metadata;
 
-    use super::profiles::CoreProfilesMetadata;
+    use super::profiles::CoreProfilesCredentialConfiguration;
 
-    pub type IssuerMetadata = metadata::IssuerMetadata<
-        CoreProfilesMetadata,
-        CoreJsonWebKeyType,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-    >;
+    pub type CredentialIssuerMetadata =
+        metadata::CredentialIssuerMetadata<CoreProfilesCredentialConfiguration>;
 }
 
 pub mod credential {
-    use openidconnect::core::{
-        CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
-    };
-
     use crate::credential;
 
-    use super::profiles::{CoreProfilesRequest, CoreProfilesResponse};
+    use super::profiles::{CoreProfilesCredentialRequest, CoreProfilesCredentialResponse};
 
-    pub type Request = credential::Request<
-        CoreProfilesRequest,
-        CoreJsonWebKeyType,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-    >;
-
-    pub type Response = credential::Response<
-        CoreProfilesResponse,
-    >;
-
-    pub type BatchRequest = credential::BatchRequest<
-        CoreProfilesRequest,
-        CoreJsonWebKeyType,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-    >;
+    pub type Request = credential::Request<CoreProfilesCredentialRequest>;
+    pub type Response = credential::Response<CoreProfilesCredentialResponse>;
+    pub type BatchRequest = credential::BatchRequest<CoreProfilesCredentialRequest>;
 }
 
 pub mod authorization {
     use crate::authorization;
 
-    use super::profiles::CoreProfilesAuthorizationDetails;
+    use super::profiles::CoreProfilesAuthorizationDetailsObject;
 
-    pub type AuthorizationDetail =
-        authorization::AuthorizationDetail<CoreProfilesAuthorizationDetails>;
+    pub type AuthorizationDetailsObject =
+        authorization::AuthorizationDetailsObject<CoreProfilesAuthorizationDetailsObject>;
 }
 
 pub mod client {
-    use openidconnect::core::{
-        CoreJsonWebKeyType, CoreJweContentEncryptionAlgorithm, CoreJweKeyManagementAlgorithm,
-    };
 
     use crate::client;
 
     use super::profiles::CoreProfiles;
 
-    pub type Client = client::Client<
-        CoreProfiles,
-        CoreJsonWebKeyType,
-        CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm,
-    >;
-}
-
-pub mod credential_offer {
-    use crate::core::profiles::CoreProfilesOffer;
-    use crate::credential_offer;
-
-    pub type CredentialOffer = credential_offer::CredentialOffer<
-        CoreProfilesOffer
-    >;
+    pub type Client = client::Client<CoreProfiles>;
 }

@@ -1,221 +1,227 @@
-use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use oauth2::{
     basic::{BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse},
-    AccessToken, AuthUrl, AuthorizationCode, ClientId, CodeTokenRequest, CsrfToken, RedirectUrl,
-    StandardRevocableToken, TokenUrl,
+    AccessToken, AuthUrl, AuthorizationCode, ClientId, CodeTokenRequest, ConfigurationError,
+    CsrfToken, EndpointMaybeSet, EndpointNotSet, EndpointSet, RedirectUrl, StandardRevocableToken,
+    TokenUrl,
 };
-use openidconnect::{
-    core::{
-        CoreApplicationType, CoreClientAuthMethod, CoreGrantType, CoreJsonWebKey,
-        CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreJweContentEncryptionAlgorithm,
-        CoreJweKeyManagementAlgorithm, CoreJwsSigningAlgorithm, CoreResponseType,
-        CoreSubjectIdentifierType, CoreTokenType,
-    },
-    registration::ClientMetadata,
-    IssuerUrl, JsonWebKeyType, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm,
-};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     authorization::AuthorizationRequest,
     credential,
+    credential_response_encryption::CredentialResponseEncryptionMetadata,
     metadata::{
-        AuthorizationMetadata, CredentialMetadata, CredentialUrl, IssuerMetadata,
-        IssuerMetadataDisplay,
+        credential_issuer::{CredentialConfiguration, CredentialIssuerMetadataDisplay},
+        AuthorizationServerMetadata, CredentialIssuerMetadata,
     },
-    profiles::{AuthorizationDetaislProfile, Profile},
+    pre_authorized_code::PreAuthorizedCodeTokenRequest,
+    profiles::Profile,
     pushed_authorization::PushedAuthorizationRequest,
     token,
-    types::{BatchCredentialUrl, DeferredCredentialUrl, ParUrl},
+    types::{
+        BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, IssuerUrl, ParUrl,
+        PreAuthorizedCode,
+    },
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Pushed authorization request is not supported")]
-    ParUnsupported(),
+    #[error("Batch Credential Request are not supported by this issuer")]
+    BcrUnsupported,
+    #[error("Pushed Authorization Requests are not supported by this issuer")]
+    ParUnsupported,
+    #[error("Authorization Requests are not supported by this issuer: {0}")]
+    AuthUnsupported(ConfigurationError),
+    #[error("An error occurred when discovering metadata: {0}")]
+    MetadataDiscovery(anyhow::Error),
 }
 
-pub struct Client<C, JT, JE, JA>
+pub struct Client<C>
 where
     C: Profile,
-    JT: JsonWebKeyType,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JA: JweKeyManagementAlgorithm,
 {
     inner: oauth2::Client<
         BasicErrorResponse,
         token::Response,
-        CoreTokenType,
         BasicTokenIntrospectionResponse,
         StandardRevocableToken,
         BasicRevocationErrorResponse,
+        EndpointMaybeSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
     >,
     issuer: IssuerUrl,
     credential_endpoint: CredentialUrl,
     par_auth_url: Option<ParUrl>,
     batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
-    credential_response_encryption_alg_values_supported: Option<Vec<JA>>,
-    credential_response_encryption_enc_values_supported: Option<Vec<JE>>,
-    require_credential_response_encryption: Option<bool>,
-    credential_configurations_supported: HashMap<String, CredentialMetadata<C::Metadata>>,
-    display: Option<Vec<IssuerMetadataDisplay>>,
-    _phantom_jt: PhantomData<JT>,
+    credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
+    credential_configurations_supported: Vec<CredentialConfiguration<C::CredentialConfiguration>>,
+    display: Option<Vec<CredentialIssuerMetadataDisplay>>,
 }
 
-impl<C, JT, JE, JA> Client<C, JT, JE, JA>
+impl<C> Client<C>
 where
     C: Profile,
-    JT: JsonWebKeyType,
-    JE: JweContentEncryptionAlgorithm<JT>,
-    JA: JweKeyManagementAlgorithm + Clone,
 {
-    pub fn new(
-        client_id: ClientId,
-        issuer: IssuerUrl,
-        credential_endpoint: CredentialUrl,
-        auth_url: AuthUrl,
-        par_auth_url: Option<ParUrl>,
-        token_url: TokenUrl,
-        redirect_uri: RedirectUrl,
-    ) -> Self {
-        let inner = oauth2::Client::new(client_id, None, auth_url, Some(token_url))
-            .set_redirect_uri(redirect_uri);
-        Self {
-            inner,
-            issuer,
-            credential_endpoint,
-            par_auth_url,
-            batch_credential_endpoint: None,
-            deferred_credential_endpoint: None,
-            credential_response_encryption_alg_values_supported: None,
-            credential_response_encryption_enc_values_supported: None,
-            require_credential_response_encryption: None,
-            credential_configurations_supported: HashMap::new(),
-            display: None,
-            _phantom_jt: PhantomData,
-        }
-    }
-
     field_getters_setters![
-        pub self [self] ["issuer metadata value"] {
+        pub self [self] ["client configuration value"] {
             set_issuer -> issuer[IssuerUrl],
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
             set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
-            set_credential_response_encryption_alg_values_supported -> credential_response_encryption_alg_values_supported[Option<Vec<JA>>],
-            set_credential_response_encryption_enc_values_supported -> credential_response_encryption_enc_values_supported[Option<Vec<JE>>],
-            set_require_credential_response_encryption -> require_credential_response_encryption[Option<bool>],
-            set_credential_configurations_supported -> credential_configurations_supported[HashMap<String, CredentialMetadata<C::Metadata>>],
-            set_display -> display[Option<Vec<IssuerMetadataDisplay>>],
+            set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryptionMetadata>],
+            set_credential_configurations_supported -> credential_configurations_supported[Vec<CredentialConfiguration<C::CredentialConfiguration>>],
+            set_display -> display[Option<Vec<CredentialIssuerMetadataDisplay>>],
         }
     ];
 
     pub fn from_issuer_metadata(
-        issuer_metadata: IssuerMetadata<C::Metadata, JT, JE, JA>,
-        authorization_metadata: AuthorizationMetadata,
         client_id: ClientId,
         redirect_uri: RedirectUrl,
+        credential_issuer_metadata: CredentialIssuerMetadata<C::CredentialConfiguration>,
+        authorization_metadata: AuthorizationServerMetadata,
     ) -> Self {
-        Self::new(
+        let inner = Self::new_inner_client(
             client_id,
-            issuer_metadata.credential_issuer().clone(),
-            issuer_metadata.credential_endpoint().clone(),
-            authorization_metadata.authorization_endpoint().clone(),
-            authorization_metadata
-                .pushed_authorization_endpoint()
-                .clone(),
-            authorization_metadata.token_endpoint().clone(),
             redirect_uri,
-        )
-        .set_batch_credential_endpoint(issuer_metadata.batch_credential_endpoint().cloned())
-        .set_deferred_credential_endpoint(issuer_metadata.deferred_credential_endpoint().cloned())
-        .set_credential_response_encryption_alg_values_supported(
-            issuer_metadata
-                .credential_response_encryption_alg_values_supported()
+            authorization_metadata.authorization_endpoint().cloned(),
+            authorization_metadata.token_endpoint().clone(),
+        );
+
+        Self {
+            inner,
+            issuer: credential_issuer_metadata.credential_issuer().clone(),
+            credential_endpoint: credential_issuer_metadata.credential_endpoint().clone(),
+            par_auth_url: authorization_metadata
+                .pushed_authorization_request_endpoint()
                 .cloned(),
-        )
-        .set_credential_response_encryption_enc_values_supported(
-            issuer_metadata
-                .credential_response_encryption_enc_values_supported()
+            batch_credential_endpoint: credential_issuer_metadata
+                .batch_credential_endpoint()
                 .cloned(),
-        )
-        .set_require_credential_response_encryption(
-            issuer_metadata.require_credential_response_encryption(),
-        )
-        .set_credential_configurations_supported(issuer_metadata.credential_configurations_supported().clone())
-        .set_display(issuer_metadata.display().cloned())
+            deferred_credential_endpoint: credential_issuer_metadata
+                .deferred_credential_endpoint()
+                .cloned(),
+            credential_response_encryption: credential_issuer_metadata
+                .credential_response_encryption()
+                .cloned(),
+            credential_configurations_supported: credential_issuer_metadata
+                .credential_configurations_supported()
+                .clone(),
+            display: credential_issuer_metadata.display().cloned(),
+        }
     }
 
-    pub fn pushed_authorization_request<S, AD>(
+    pub fn pushed_authorization_request<S>(
         &self,
         state_fn: S,
-    ) -> Result<PushedAuthorizationRequest<AD>, Error>
+    ) -> Result<PushedAuthorizationRequest, Error>
     where
         S: FnOnce() -> CsrfToken,
-        AD: AuthorizationDetaislProfile,
     {
-        if self.par_auth_url.is_none() {
-            return Err(Error::ParUnsupported());
-        }
-        let inner = self.inner.authorize_url(state_fn);
+        let Some(par_url) = self.par_auth_url.as_ref() else {
+            return Err(Error::ParUnsupported);
+        };
+        let inner = self.authorize_url(state_fn)?;
         Ok(PushedAuthorizationRequest::new(
             inner,
-            self.par_auth_url.clone().unwrap(),
-            self.inner.auth_url().clone(),
-            vec![],
-            None,
-            None,
-            None,
+            par_url.clone(),
+            self.inner
+                .auth_uri()
+                .cloned()
+                .ok_or(Error::AuthUnsupported(ConfigurationError::MissingUrl(
+                    "authorization",
+                )))?,
         ))
     }
 
-    pub fn authorize_url<S, AD>(&self, state_fn: S) -> AuthorizationRequest<AD>
+    pub fn authorize_url<S>(&self, state_fn: S) -> Result<AuthorizationRequest, Error>
     where
         S: FnOnce() -> CsrfToken,
-        AD: AuthorizationDetaislProfile,
     {
-        let inner = self.inner.authorize_url(state_fn);
-        AuthorizationRequest::new(inner, vec![], None, None, None)
+        let inner = self
+            .inner
+            .authorize_url(state_fn)
+            .map_err(Error::AuthUnsupported)?;
+        Ok(AuthorizationRequest::new(inner))
     }
 
     pub fn exchange_code(
         &self,
         code: AuthorizationCode,
-    ) -> CodeTokenRequest<'_, token::Error, token::Response, CoreTokenType> {
+    ) -> CodeTokenRequest<'_, BasicErrorResponse, token::Response> {
         self.inner.exchange_code(code)
+    }
+
+    pub fn exchange_pre_authorized_code(
+        &self,
+        pre_authorized_code: PreAuthorizedCode,
+    ) -> PreAuthorizedCodeTokenRequest<'_, BasicErrorResponse, token::Response> {
+        PreAuthorizedCodeTokenRequest {
+            auth_type: self.inner.auth_type(),
+            client_id: Some(self.inner.client_id()),
+            client_secret: None,
+            code: pre_authorized_code,
+            extra_params: Vec::new(),
+            token_url: self.inner.token_uri(),
+            tx_code: None,
+            _phantom: PhantomData,
+        }
     }
 
     pub fn request_credential(
         &self,
         access_token: AccessToken,
-        profile_fields: C::Credential,
-    ) -> credential::RequestBuilder<C::Credential, JT, JE, JA> {
+        profile_fields: C::CredentialRequest,
+    ) -> credential::RequestBuilder<C::CredentialRequest> {
         let body = credential::Request::new(profile_fields);
         credential::RequestBuilder::new(body, self.credential_endpoint().clone(), access_token)
     }
+
+    pub fn batch_request_credential(
+        &self,
+        access_token: AccessToken,
+        profile_fields: Vec<C::CredentialRequest>,
+    ) -> Result<credential::BatchRequestBuilder<C::CredentialRequest>, Error> {
+        let Some(endpoint) = self.batch_credential_endpoint() else {
+            return Err(Error::BcrUnsupported);
+        };
+        let body = credential::BatchRequest::new(
+            profile_fields
+                .into_iter()
+                .map(credential::Request::new)
+                .collect(),
+        );
+        Ok(credential::BatchRequestBuilder::new(
+            body,
+            endpoint.clone(),
+            access_token,
+        ))
+    }
+
+    fn new_inner_client(
+        client_id: ClientId,
+        redirect_uri: RedirectUrl,
+        auth_url: Option<AuthUrl>,
+        token_url: TokenUrl,
+    ) -> oauth2::Client<
+        BasicErrorResponse,
+        token::Response,
+        BasicTokenIntrospectionResponse,
+        StandardRevocableToken,
+        BasicRevocationErrorResponse,
+        EndpointMaybeSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointNotSet,
+        EndpointSet,
+    > {
+        oauth2::Client::new(client_id)
+            .set_redirect_uri(redirect_uri)
+            .set_auth_uri_option(auth_url)
+            .set_token_uri(token_url)
+    }
 }
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct AdditionalClientMetadata {
-    credential_offer_endpoint: Option<CredentialUrl>,
-}
-
-impl openidconnect::registration::AdditionalClientMetadata for AdditionalClientMetadata {}
-
-pub type Metadata = ClientMetadata<
-    AdditionalClientMetadata,
-    CoreApplicationType,
-    CoreClientAuthMethod,
-    CoreGrantType,
-    CoreJweContentEncryptionAlgorithm,
-    CoreJweKeyManagementAlgorithm,
-    CoreJwsSigningAlgorithm,
-    CoreJsonWebKeyType,
-    CoreJsonWebKeyUse,
-    CoreJsonWebKey,
-    CoreResponseType,
-    CoreSubjectIdentifierType,
->; // TODO
