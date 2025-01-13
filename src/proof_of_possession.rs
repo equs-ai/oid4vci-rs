@@ -1,17 +1,26 @@
-use async_trait::async_trait;
-use base64::Engine;
-use openidconnect::Nonce;
+// use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use ssi::{
-    did::{DIDURL, Resource, VerificationMethod},
-    did_resolve::{Content, dereference, DereferencingInputMetadata, DIDResolver},
-    jwk::{Algorithm, JWK},
+use serde_json::Value;
+use ssi_claims::{
     jws::{self, Header},
     jwt,
 };
+use ssi_dids_core::DIDURLBuf;
+use ssi_jwk::{Algorithm, JWKResolver, JWK};
 use time::{Duration, OffsetDateTime};
 
+use crate::types::Nonce;
+
 const JWS_TYPE: &str = "openid4vci-proof+jwt";
+
+pub type ProofSigningAlgValuesSupported = Vec<ssi_jwk::Algorithm>;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct KeyProofTypesSupported {
+    #[serde(rename = "$key$")]
+    pub key: KeyProofType,
+    pub proof_signing_alg_values_supported: ProofSigningAlgValuesSupported,
+}
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash, Eq)]
 pub enum KeyProofType {
@@ -19,38 +28,19 @@ pub enum KeyProofType {
     Jwt,
     #[serde(rename = "cwt")]
     Cwt,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, Hash, Eq)]
-pub struct ProofType {
-    pub proof_signing_alg_values_supported: Vec<String>,
-    #[serde(flatten)]
-    other: serde_json::Value,
-}
-
-impl ProofType {
-
-    pub fn new(proof_signing_alg_values_supported: Vec<String>) -> Self {
-        Self {
-            proof_signing_alg_values_supported,
-            other: serde_json::Value::Null,
-        }
-    }
-
-    field_getters_setters![
-        pub self [self] ["proof type value"] {
-            set_other -> other[serde_json::Value],
-        }
-    ];
+    #[serde(rename = "ldp_vp")]
+    LdpVp,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(tag = "proof_type")]
 pub enum Proof {
     #[serde(rename = "jwt")]
-    JWT { jwt: String },
+    Jwt { jwt: String },
     #[serde(rename = "cwt")]
-    CWT { cwt: String },
+    Cwt { cwt: String },
+    #[serde(rename = "ldp_vp")]
+    LdpVp { ldp_vp: Value },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -86,7 +76,7 @@ pub struct ProofOfPossession {
 
 #[derive(Debug, Clone)]
 pub struct ProofOfPossessionController {
-    pub vm: Option<DIDURL>,
+    pub vm: Option<DIDURLBuf>,
     pub jwk: JWK,
 }
 
@@ -101,7 +91,7 @@ pub struct ProofOfPossessionVerificationParams {
     pub audience: String,
     pub issuer: Option<String>,
     pub nonce: Nonce,
-    pub controller_did: Option<String>,
+    pub controller_did: Option<DIDURLBuf>,
     pub controller_jwk: Option<JWK>,
     /// Slack in nbf validation to deal with clock synchronisation issues.
     pub nbf_tolerance: Option<Duration>,
@@ -134,7 +124,7 @@ pub enum ConversionError {
     #[error(transparent)]
     SerializationError(#[from] serde_json::Error),
     #[error(transparent)]
-    SigningError(#[from] ssi::jws::Error),
+    SigningError(#[from] ssi_claims::jws::Error),
     #[error("Unable to select JWT algorithm, please specify in JWK")]
     MissingJWKAlg,
 }
@@ -142,7 +132,7 @@ pub enum ConversionError {
 #[derive(thiserror::Error, Debug)]
 pub enum ParsingError {
     #[error(transparent)]
-    InvalidJWS(#[from] ssi::jws::Error),
+    InvalidJWS(#[from] ssi_claims::jws::Error),
     #[error("JWS type header is invalid, expected `{expected}`, found `{actual}`")]
     InvalidJWSType { actual: String, expected: String },
     #[error("JWS does not specify an algorithm")]
@@ -154,13 +144,17 @@ pub enum ParsingError {
     #[error("Could not retrieve JWK from KID: {0}")]
     KIDDereferenceError(String),
     #[error(transparent)]
-    DIDDereferenceError(#[from] ssi::did::Error),
+    DIDDereferenceError(#[from] ssi_dids_core::resolution::Error),
+    #[error(transparent)]
+    InvalidDIDURL(#[from] ssi_dids_core::InvalidDIDURL<String>),
+    #[error(transparent)]
+    ProofValidationError(#[from] ssi_claims::ProofValidationError),
 }
 
-#[async_trait]
-pub trait Signer: Sync + Send {
-    async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, jws::Error>;
-}
+// #[async_trait]
+// pub trait Signer: Sync + Send {
+//     async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, jws::Error>;
+// }
 
 impl ProofOfPossession {
     pub fn generate(params: &ProofOfPossessionParams, expiry: Duration) -> Self {
@@ -179,7 +173,7 @@ impl ProofOfPossession {
         }
     }
 
-    fn prepare_jwt_parts(&self) -> Result<(String, &JWK, Header), ConversionError> {
+    fn to_unsigned_jwt(&self) -> Result<(Header, String), ConversionError> {
         let jwk = &self.controller.jwk;
         let alg = if let Some(a) = jwk.get_algorithm() {
             a
@@ -188,7 +182,7 @@ impl ProofOfPossession {
         };
         let payload = serde_json::to_string(&self.body)?;
         let (h_kid, h_jwk) = match (self.controller.vm.clone(), jwk.key_id.clone()) {
-            (Some(vm), _) => (Some(vm.did), None),
+            (Some(vm), _) => (Some(vm.to_string()), None),
             (None, Some(kid)) => (Some(kid), None),
             (None, None) => (None, Some(jwk.to_public())),
         };
@@ -199,40 +193,62 @@ impl ProofOfPossession {
             type_: Some(JWS_TYPE.to_string()),
             ..Default::default()
         };
-        Ok((payload, jwk, header))
+        Ok((header, payload))
     }
 
-    pub fn to_jwt(&self) -> Result<String, ConversionError> {
-        let (payload, jwk, header) = self.prepare_jwt_parts()?;
-        Ok(jws::encode_sign_custom_header(&payload, jwk, &header)?)
+    pub fn to_jwt_signing_input(&self) -> Result<Vec<u8>, ConversionError> {
+        let (header_b64, payload_b64) = self.encode_header_and_payload()?;
+
+        let signing_input = [header_b64.as_bytes(), b".", payload_b64.as_bytes()]
+            .concat()
+            .to_vec();
+        Ok(signing_input)
     }
 
-    pub async fn to_jwt_with_signer<S: Signer>(&self, signer: S) -> Result<String, ConversionError> {
-        let (payload, _, header) = self.prepare_jwt_parts()?;
+    pub fn to_jwt_with_signature(&self, signature: Vec<u8>) -> Result<String, ConversionError> {
+        use base64::prelude::*;
+
+        let encoder = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+        let (header_b64, payload_b64) = self.encode_header_and_payload()?;
+        let sig_b64 = encoder.encode(signature);
+        let jws = [header_b64, payload_b64, sig_b64].join(".");
+
+        Ok(jws)
+    }
+
+    fn encode_header_and_payload(&self) -> Result<(String, String), ConversionError> {
+        use base64::prelude::*;
+
+        let (header, payload) = self.to_unsigned_jwt()?;
 
         let encoder = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
         let h_json = serde_json::to_string(&header)?;
         let header_b64 = encoder.encode(&h_json);
         let payload_b64 = encoder.encode(payload);
-        let signing_input = header_b64 + "." + &payload_b64;
-        let signed = signer.sign(signing_input.as_bytes()).await?;
-        let sig_b64 = encoder.encode(signed);
-        let jws = [signing_input, sig_b64].join(".");
-        Ok(jws)
+
+        Ok((header_b64, payload_b64))
+    }
+
+    pub fn to_jwt(&self) -> Result<String, ConversionError> {
+        let jwk = &self.controller.jwk;
+        let (header, payload) = self.to_unsigned_jwt()?;
+        Ok(jws::encode_sign_custom_header(&payload, jwk, &header)?)
     }
 
     pub async fn from_proof(
         proof: &Proof,
-        resolver: &dyn DIDResolver,
+        resolver: impl JWKResolver,
     ) -> Result<Self, ParsingError> {
         match proof {
-            Proof::JWT { jwt } => Self::from_jwt(jwt, resolver).await,
-            Proof::CWT { .. } => todo!(),
+            Proof::Jwt { jwt } => Self::from_jwt(jwt, resolver).await,
+            Proof::Cwt { .. } => todo!(),
+            Proof::LdpVp { .. } => todo!(),
         }
     }
 
-    pub async fn from_jwt(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, ParsingError> {
+    pub async fn from_jwt(jwt: &str, resolver: impl JWKResolver) -> Result<Self, ParsingError> {
         let header: Header = jws::decode_unverified(jwt)?.0;
 
         if header.type_ != Some(JWS_TYPE.to_string()) {
@@ -247,9 +263,11 @@ impl ProofOfPossession {
         let (controller, jwk) = match (header.key_id, header.jwk, header.x509_certificate_chain) {
             (Some(kid), None, None) => {
                 let vm = kid.parse()?;
-                get_jwk_from_kid(&kid, resolver)
+                //get_jwk_from_kid(&kid, resolver)
+                resolver
+                    .fetch_public_jwk(Some(&kid))
                     .await
-                    .map(|r| (Some(vm), r))?
+                    .map(|r| (Some(vm), r.into_owned()))?
             }
             (None, Some(jwk), None) => (None, jwk),
             (None, None, Some(_x5c)) => {
@@ -313,7 +331,7 @@ impl ProofOfPossession {
         if let Some(did) = &params.controller_did {
             if self.controller.vm.is_none() {
                 return Err(VerificationError::InvalidDID {
-                    expected: did.clone(),
+                    expected: did.to_string(),
                     actual: format!("{:?}", self.controller.vm),
                 });
             }
@@ -323,43 +341,20 @@ impl ProofOfPossession {
     }
 }
 
-async fn get_jwk_from_kid(kid: &str, resolver: &dyn DIDResolver) -> Result<JWK, ParsingError> {
-    let (_, content, _) = dereference(resolver, kid, &DereferencingInputMetadata::default()).await;
-
-    let vm = match content {
-        Content::Object(Resource::VerificationMethod(vm)) => Ok(vm),
-        Content::DIDDocument(document) => {
-            if let VerificationMethod::Map(vm) =
-                document.verification_method.unwrap().first().unwrap()
-            {
-                Ok(vm.to_owned())
-            } else {
-                Err(ParsingError::KIDDereferenceError(
-                    "could not find any verification method".into(),
-                ))
-            }
-        }
-
-        _ => Err(ParsingError::KIDDereferenceError(
-            "could not find specified verification method".into(),
-        )),
-    }?;
-
-    Ok(vm.get_jwk()?)
-}
-
 #[cfg(test)]
 mod test {
     use did_jwk::DIDJWK;
+    use did_method_key::DIDKey;
     use serde_json::json;
-    use ssi::did::{DIDMethod, Source};
-    use ssi::jws::Error;
+    use ssi_dids_core::{DIDResolver, VerificationMethodDIDResolver};
+    use ssi_jwk::JWK;
+    use ssi_verification_methods::AnyMethod;
 
     use super::*;
 
-    fn generate_pop(expires_in: Duration) -> (ProofOfPossession, String) {
-        let jwk = serde_json::from_value(json!({"kty":"OKP","crv":"Ed25519","x":"h3GzIK3pU8oTspVBKstiPSHR3VH_USS2FA0NrAOZ51s","d":"pfYMFvJ-LlMO4-EBBsrjpfAVz5UEYNVgbTphLPZypbE"})).unwrap();
-        let did = DIDJWK.generate(&Source::Key(&jwk)).unwrap();
+    fn generate_pop(expires_in: Duration) -> (ProofOfPossession, DIDURLBuf) {
+        let jwk: JWK = serde_json::from_value(json!({"kty":"OKP","crv":"Ed25519","x":"h3GzIK3pU8oTspVBKstiPSHR3VH_USS2FA0NrAOZ51s","d":"pfYMFvJ-LlMO4-EBBsrjpfAVz5UEYNVgbTphLPZypbE"})).unwrap();
+        let did_url = DIDJWK::generate_url(&jwk);
 
         (
             ProofOfPossession::generate(
@@ -369,12 +364,12 @@ mod test {
                     nonce: None,
                     controller: ProofOfPossessionController {
                         jwk,
-                        vm: Some(did.parse().unwrap()),
+                        vm: Some(did_url.clone()),
                     },
                 },
                 expires_in,
             ),
-            did,
+            did_url,
         )
     }
 
@@ -386,7 +381,8 @@ mod test {
 
         let pop_jwt = pop.to_jwt().unwrap();
 
-        let pop = ProofOfPossession::from_jwt(&pop_jwt, &DIDJWK)
+        let resolver: VerificationMethodDIDResolver<_, AnyMethod> = DIDJWK.into_vm_resolver();
+        let pop = ProofOfPossession::from_jwt(&pop_jwt, resolver)
             .await
             .unwrap();
 
@@ -404,28 +400,40 @@ mod test {
     }
 
     #[tokio::test]
-    async fn basic_with_signer() {
+    async fn basic_didkey_p256() {
         let expires_in = Duration::minutes(5);
-
-        let (pop, did) = generate_pop(expires_in);
-
-        let pop_jwt = pop.to_jwt_with_signer(TestSigner { jwk: pop.controller.jwk.clone() }).await.unwrap();
-
-        let pop = ProofOfPossession::from_jwt(&pop_jwt, &DIDJWK)
+        let jwk = JWK::generate_p256();
+        let did_url = DIDKey::generate_url(&jwk).unwrap();
+        let pop_jwt = ProofOfPossession::generate(
+            &ProofOfPossessionParams {
+                issuer: Some("test".to_string()),
+                // audience: Url::parse("http://localhost:300").unwrap(),
+                audience: "http://localhost:300".to_string(),
+                nonce: None,
+                controller: ProofOfPossessionController {
+                    jwk,
+                    vm: Some(did_url.clone()),
+                },
+            },
+            expires_in,
+        )
+        .to_jwt()
+        .unwrap();
+        let resolver: VerificationMethodDIDResolver<_, AnyMethod> = DIDKey.into_vm_resolver();
+        let pop = ProofOfPossession::from_jwt(&pop_jwt, resolver)
             .await
             .unwrap();
-
         pop.verify(&ProofOfPossessionVerificationParams {
             nonce: pop.body.nonce.clone(),
             audience: pop.body.audience.clone(),
             issuer: Some("test".to_string()),
-            controller_did: Some(did),
+            controller_did: Some(did_url),
             controller_jwk: None,
             nbf_tolerance: None,
             exp_tolerance: None,
         })
-            .await
-            .unwrap();
+        .await
+        .unwrap();
     }
 
     #[tokio::test]
@@ -441,7 +449,8 @@ mod test {
 
         let pop_jwt = pop.to_jwt().unwrap();
 
-        let pop = ProofOfPossession::from_jwt(&pop_jwt, &DIDJWK)
+        let resolver: VerificationMethodDIDResolver<_, AnyMethod> = DIDJWK.into_vm_resolver();
+        let pop = ProofOfPossession::from_jwt(&pop_jwt, resolver)
             .await
             .unwrap();
 
@@ -475,7 +484,8 @@ mod test {
 
         let pop_jwt = pop.to_jwt().unwrap();
 
-        let pop = ProofOfPossession::from_jwt(&pop_jwt, &DIDJWK)
+        let resolver: VerificationMethodDIDResolver<_, AnyMethod> = DIDJWK.into_vm_resolver();
+        let pop = ProofOfPossession::from_jwt(&pop_jwt, resolver)
             .await
             .unwrap();
 
@@ -500,14 +510,14 @@ mod test {
             .expect("should have passed with exp tolerance");
     }
 
-    struct TestSigner {
-        jwk: JWK,
-    }
+    // struct TestSigner {
+    //     jwk: JWK,
+    // }
 
-    #[async_trait]
-    impl Signer for TestSigner {
-        async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
-            jws::sign_bytes(self.jwk.get_algorithm().unwrap(), data, &self.jwk)
-        }
-    }
+    // #[async_trait]
+    // impl Signer for TestSigner {
+    //     async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
+    //         jws::sign_bytes(self.jwk.get_algorithm().unwrap(), data, &self.jwk)
+    //     }
+    // }
 }
