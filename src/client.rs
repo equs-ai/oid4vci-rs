@@ -166,7 +166,7 @@ where
             client_secret: None,
             code: pre_authorized_code,
             extra_params: Vec::new(),
-            token_url: self.inner.token_uri(),
+            token_url: self.inner.token_uri().clone(),
             tx_code: None,
             _phantom: PhantomData,
         }
