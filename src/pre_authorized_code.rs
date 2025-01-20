@@ -32,7 +32,7 @@ where
     pub(crate) client_secret: Option<&'a ClientSecret>,
     pub(crate) code: PreAuthorizedCode,
     pub(crate) extra_params: Vec<(Cow<'a, str>, Cow<'a, str>)>,
-    pub(crate) token_url: &'a TokenUrl,
+    pub(crate) token_url: TokenUrl,
     pub(crate) tx_code: Option<&'a TxCode>,
     pub(crate) _phantom: PhantomData<(TE, TR)>,
 }
@@ -70,6 +70,11 @@ where
 
     pub fn set_anonymous_client(mut self) -> Self {
         self.client_id = None;
+        self
+    }
+
+    pub fn set_token_url(mut self, url: TokenUrl) -> Self {
+        self.token_url = url;
         self
     }
 
