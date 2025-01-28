@@ -294,7 +294,7 @@ mod test {
             "code_challenge_method": "S256",
             "redirect_uri": "https://client.example.org/cb",
 
-            "scope": "vc+sd-jwt",
+            "scope": "dc+sd-jwt",
             "response_type": "code",
 
             "authorization_details": "[]",
@@ -334,7 +334,7 @@ mod test {
             .pushed_authorization_request(move || state)
             .unwrap()
             .set_pkce_challenge(pkce_challenge)
-            .set_scope(Scope::new("vc+sd-jwt".to_owned()))
+            .set_scope(Scope::new("dc+sd-jwt".to_owned()))
             .set_response_type(&ResponseType::new("code".to_owned()))
             .set_authorization_details::<CoreProfilesAuthorizationDetailsObject>(vec![])
             .unwrap()
