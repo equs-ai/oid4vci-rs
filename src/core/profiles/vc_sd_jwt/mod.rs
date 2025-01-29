@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const FORMAT_IDENTIFIER: &str = "spruce-vc+sd-jwt";
+pub const FORMAT_IDENTIFIER: &str = "dc+sd-jwt";
 pub use authorization_detail::{AuthorizationDetailsObject, AuthorizationDetailsObjectWithFormat};
 pub use credential_configuration::CredentialConfiguration;
 pub use credential_request::{CredentialRequest, CredentialRequestWithFormat};
@@ -16,7 +16,7 @@ pub use credential_response::CredentialResponse;
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub enum Format {
     #[default]
-    #[serde(rename = "vc+sd-jwt")]
+    #[serde(rename = "dc+sd-jwt")]
     VcSdJwt,
 }
 
