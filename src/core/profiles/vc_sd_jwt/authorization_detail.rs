@@ -53,8 +53,8 @@ mod test {
         let expected_json = json!(
             {
                 "type": "openid_credential",
-                "format": "spruce-dc+sd-jwt",
-                "vct": "SD_JWT_DC_example_in_OpenID4VCI"
+                "format": "dc+sd-jwt",
+                "vct": "SD_JWT_VC_example_in_OpenID4VCI"
             }
         );
 
