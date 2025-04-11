@@ -48,8 +48,6 @@ mod test {
                                        rRvGYppdiK37GU4NBeoPakxpWhAvsVSt"
                     }
                 },
-                "c_nonce": "fGFF7UkhLa",
-                "c_nonce_expires_in": 86400
             }
         );
 

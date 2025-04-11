@@ -17,6 +17,7 @@ pub mod proof_of_possession;
 pub mod pushed_authorization;
 pub mod token;
 pub mod types;
+pub mod nonce;
 
 pub use oauth2;
 
