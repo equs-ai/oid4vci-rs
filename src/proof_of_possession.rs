@@ -248,6 +248,17 @@ impl ProofOfPossession {
         }
     }
 
+    pub async fn get_unverified_body(proof: &Proof) -> Result<ProofOfPossessionBody, ParsingError> {
+        match proof {
+            Proof::Jwt { jwt } => {
+                let body = jwt::decode_unverified(jwt)?;
+                Ok(body)
+            }
+            Proof::Cwt { .. } => todo!(),
+            Proof::LdpVp { .. } => todo!(),
+        }
+    }
+
     pub async fn from_jwt(jwt: &str, resolver: impl JWKResolver) -> Result<Self, ParsingError> {
         let header: Header = jws::decode_unverified(jwt)?.0;
 

@@ -123,17 +123,16 @@ where
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Response {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    c_nonce: Option<Nonce>,
+    c_nonce: Nonce,
 }
 
 impl Response {
     pub fn new(c_nonce: Nonce) -> Self {
-        Self { c_nonce: Some(c_nonce) }
+        Self { c_nonce }
     }
     field_getters_setters![
         pub self [self] ["credential response value"] {
-            set_nonce -> c_nonce[Option<Nonce>],
+            set_nonce -> c_nonce[Nonce],
         }
     ];
 }

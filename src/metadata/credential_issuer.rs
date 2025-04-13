@@ -3,6 +3,8 @@ use oauth2::Scope;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, KeyValueMap};
 
+use super::MetadataDiscovery;
+use crate::types::NonceUrl;
 use crate::{
     credential_response_encryption::CredentialResponseEncryptionMetadata,
     profiles::CredentialConfigurationProfile,
@@ -12,8 +14,6 @@ use crate::{
         IssuerUrl, LanguageTag, LogoUri, NotificationUrl,
     },
 };
-use crate::types::NonceUrl;
-use super::MetadataDiscovery;
 
 #[serde_as]
 #[skip_serializing_none]
