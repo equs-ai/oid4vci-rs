@@ -64,8 +64,8 @@ pub struct ProofOfPossessionBody {
     pub issued_at: Option<OffsetDateTime>,
     #[serde(rename = "exp", with = "time::serde::timestamp")]
     pub expires_at: OffsetDateTime,
-    #[serde(rename = "nonce")]
-    pub nonce: Nonce,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<Nonce>,
 }
 
 #[derive(Debug, Clone)]
@@ -90,7 +90,7 @@ pub struct ProofOfPossessionParams {
 pub struct ProofOfPossessionVerificationParams {
     pub audience: String,
     pub issuer: Option<String>,
-    pub nonce: Nonce,
+    pub nonce: Option<Nonce>,
     pub controller_did: Option<DIDURLBuf>,
     pub controller_jwk: Option<JWK>,
     /// Slack in nbf validation to deal with clock synchronisation issues.
@@ -167,7 +167,7 @@ impl ProofOfPossession {
                 not_before: Some(now),
                 issued_at: Some(now),
                 expires_at: exp,
-                nonce: params.nonce.clone().unwrap_or_else(Nonce::new_random),
+                nonce: params.nonce.clone(),
             },
             controller: params.controller.clone(),
         }
