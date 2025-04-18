@@ -7,6 +7,7 @@ use oauth2::{
     TokenUrl,
 };
 
+use crate::types::NonceUrl;
 use crate::{
     authorization::AuthorizationRequest,
     credential,
@@ -15,6 +16,7 @@ use crate::{
         credential_issuer::{CredentialConfiguration, CredentialIssuerMetadataDisplay},
         AuthorizationServerMetadata, CredentialIssuerMetadata,
     },
+    nonce,
     pre_authorized_code::PreAuthorizedCodeTokenRequest,
     profiles::Profile,
     pushed_authorization::PushedAuthorizationRequest,
@@ -55,6 +57,7 @@ where
     >,
     issuer: IssuerUrl,
     credential_endpoint: CredentialUrl,
+    nonce_endpoint: Option<NonceUrl>,
     par_auth_url: Option<ParUrl>,
     batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
@@ -96,6 +99,7 @@ where
             inner,
             issuer: credential_issuer_metadata.credential_issuer().clone(),
             credential_endpoint: credential_issuer_metadata.credential_endpoint().clone(),
+            nonce_endpoint: credential_issuer_metadata.nonce_endpoint().cloned(),
             par_auth_url: authorization_metadata
                 .pushed_authorization_request_endpoint()
                 .cloned(),
@@ -179,6 +183,14 @@ where
     ) -> credential::RequestBuilder<C::CredentialRequest> {
         let body = credential::Request::new(profile_fields);
         credential::RequestBuilder::new(body, self.credential_endpoint().clone(), access_token)
+    }
+
+    pub fn request_nonce(&self) -> Option<nonce::Request> {
+        if let Some(nonce_endpoint) = &self.nonce_endpoint {
+            return Some(nonce::Request::new(nonce_endpoint.to_owned()));
+        }
+
+        None
     }
 
     pub fn batch_request_credential(

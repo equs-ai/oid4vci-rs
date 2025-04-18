@@ -14,7 +14,7 @@ use oauth2::{
         HeaderValue, Method, StatusCode,
     },
     AsyncHttpClient, AuthUrl, ClientId, CsrfToken, HttpRequest, PkceCodeChallenge,
-    PkceCodeChallengeMethod, RedirectUrl, SyncHttpClient, Scope, ResponseType,
+    PkceCodeChallengeMethod, RedirectUrl, ResponseType, Scope, SyncHttpClient,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none};
@@ -266,7 +266,6 @@ impl<'a> PushedAuthorizationRequest<'a> {
         self.inner = self.inner.set_response_type(response_type);
         self
     }
-
 }
 
 #[cfg(test)]

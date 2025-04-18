@@ -16,7 +16,7 @@ use crate::{
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
     profiles::{CredentialRequestProfile, CredentialResponseProfile},
     proof_of_possession::Proof,
-    types::{BatchCredentialUrl, CredentialUrl, Nonce},
+    types::{BatchCredentialUrl, CredentialUrl},
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -333,10 +333,6 @@ where
     #[serde(flatten, bound = "CR: CredentialResponseProfile")]
     response_kind: ResponseEnum<CR>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    c_nonce: Option<Nonce>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    c_nonce_expires_in: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     notification_id: Option<String>,
 }
 
@@ -347,16 +343,12 @@ where
     pub fn new(response_kind: ResponseEnum<CR>) -> Self {
         Self {
             response_kind,
-            c_nonce: None,
-            c_nonce_expires_in: None,
             notification_id: None,
         }
     }
     field_getters_setters![
         pub self [self] ["credential response value"] {
             set_response_kind -> response_kind[ResponseEnum<CR>],
-            set_nonce -> c_nonce[Option<Nonce>],
-            set_nonce_expiration -> c_nonce_expires_in[Option<i64>],
             set_notification_id -> notification_id[Option<String>],
         }
     ];
@@ -422,10 +414,6 @@ where
 {
     #[serde(bound = "CR: CredentialResponseProfile")]
     credential_responses: Vec<ResponseEnum<CR>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    c_nonce: Option<Nonce>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    c_nonce_expires_in: Option<i64>,
 }
 
 impl<CR> BatchResponse<CR>
@@ -435,15 +423,11 @@ where
     pub fn new(credential_responses: Vec<ResponseEnum<CR>>) -> Self {
         Self {
             credential_responses,
-            c_nonce: None,
-            c_nonce_expires_in: None,
         }
     }
     field_getters_setters![
         pub self [self] ["batch credential response value"] {
             set_credential_responses -> credential_responses[Vec<ResponseEnum<CR>>],
-            set_nonce -> c_nonce[Option<Nonce>],
-            set_nonce_expiration -> c_nonce_expires_in[Option<i64>],
         }
     ];
 }
@@ -520,8 +504,6 @@ mod test {
         let _: Response<CoreProfilesCredentialResponse> = serde_json::from_value(json!({
             "format": "jwt_vc_json",
             "credential": "LUpixVCWJk0eOt4CXQe1NXK....WZwmhmn9OQp6YxX0a2L",
-            "c_nonce": "fGFF7UkhLa",
-            "c_nonce_expires_in": 86400
         }))
         .unwrap();
     }
@@ -530,8 +512,6 @@ mod test {
     fn example_credential_deferred_response_object() {
         let _: Response<CoreProfilesCredentialResponse> = serde_json::from_value(json!({
             "transaction_id": "8xLOxBtZp8",
-            "c_nonce": "wlbQc6pCJp",
-            "c_nonce_expires_in": 86400
         }))
         .unwrap();
     }
@@ -541,8 +521,6 @@ mod test {
         let _: Error = serde_json::from_value(json!({
             "error": "invalid_proof",
             "error_description": "Credential Issuer requires key proof to be bound to a Credential Issuer provided nonce.",
-            "c_nonce": "8YE9hCnyV2",
-            "c_nonce_expires_in": 86400
         }))
         .unwrap();
     }
@@ -588,8 +566,6 @@ mod test {
                 "format": "mso_mdoc",
                 "credential": "YXNkZnNhZGZkamZqZGFza23....29tZTIzMjMyMzIzMjMy"
               }],
-              "c_nonce": "fGFF7UkhLa",
-              "c_nonce_expires_in": 86400
         }))
         .unwrap();
     }
@@ -606,8 +582,6 @@ mod test {
                  "credential":"YXNkZnNhZGZkamZqZGFza23....29tZTIzMjMyMzIzMjMy"
               }
            ],
-           "c_nonce":"fGFF7UkhLa",
-           "c_nonce_expires_in":86400
         }))
         .unwrap();
     }

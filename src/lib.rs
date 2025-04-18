@@ -10,6 +10,7 @@ pub mod credential_response_encryption;
 mod deny_field;
 mod http_utils;
 pub mod metadata;
+pub mod nonce;
 pub mod notification;
 pub mod pre_authorized_code;
 pub mod profiles;

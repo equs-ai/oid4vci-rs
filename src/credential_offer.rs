@@ -309,6 +309,6 @@ mod test {
               }
            }
         }))
-            .unwrap();
+        .unwrap();
     }
 }

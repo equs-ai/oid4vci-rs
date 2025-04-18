@@ -363,6 +363,11 @@ new_url_type![
 ];
 
 new_url_type![
+    /// URL of the Credential Issuer's Nonce Endpoint.
+    NonceUrl
+];
+
+new_url_type![
     /// URL of the Credential Issuer's Credential Endpoint.
     CredentialUrl
 ];

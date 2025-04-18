@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use oauth2::basic::BasicTokenType;
 use oauth2::{
     AuthorizationCode, ClientId, ExtraTokenFields, RedirectUrl, RefreshToken, StandardTokenResponse,
@@ -7,7 +5,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none};
 
-use crate::types::{Nonce, PreAuthorizedCode};
+use crate::types::PreAuthorizedCode;
 use crate::{
     authorization::AuthorizationDetailsObject,
     core::profiles::CoreProfilesAuthorizationDetailsObject,
@@ -43,8 +41,6 @@ pub struct ExtraResponseTokenFields<AD>
 where
     AD: AuthorizationDetailsObjectProfile,
 {
-    pub c_nonce: Option<Nonce>,
-    pub c_nonce_expires_in: Option<Duration>,
     #[serde(bound = "AD: AuthorizationDetailsObjectProfile")]
     pub authorization_details: Option<Vec<AuthorizationDetailsObject<AD>>>,
 }

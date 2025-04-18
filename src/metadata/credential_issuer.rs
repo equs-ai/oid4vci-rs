@@ -3,6 +3,8 @@ use oauth2::Scope;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, KeyValueMap};
 
+use super::MetadataDiscovery;
+use crate::types::NonceUrl;
 use crate::{
     credential_response_encryption::CredentialResponseEncryptionMetadata,
     profiles::CredentialConfigurationProfile,
@@ -12,8 +14,6 @@ use crate::{
         IssuerUrl, LanguageTag, LogoUri, NotificationUrl,
     },
 };
-
-use super::MetadataDiscovery;
 
 #[serde_as]
 #[skip_serializing_none]
@@ -25,6 +25,7 @@ where
     credential_issuer: IssuerUrl,
     authorization_servers: Option<Vec<IssuerUrl>>,
     credential_endpoint: CredentialUrl,
+    nonce_endpoint: Option<NonceUrl>,
     batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
     notification_endpoint: Option<NotificationUrl>,
@@ -64,6 +65,7 @@ where
             credential_issuer,
             authorization_servers: None,
             credential_endpoint,
+            nonce_endpoint: None,
             batch_credential_endpoint: None,
             deferred_credential_endpoint: None,
             notification_endpoint: None,
@@ -80,6 +82,7 @@ where
             set_credential_issuer -> credential_issuer[IssuerUrl],
             set_authorization_servers -> authorization_servers[Option<Vec<IssuerUrl>>],
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
+            set_nonce_endpoint -> nonce_endpoint[Option<NonceUrl>],
             set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
             set_notification_endpoint -> notification_endpoint[Option<NotificationUrl>],
@@ -282,6 +285,7 @@ mod test {
             "credential_issuer": "https://credential-issuer.example.com",
             "authorization_servers": [ "https://server.example.com" ],
             "credential_endpoint": "https://credential-issuer.example.com",
+            "nonce_endpoint": "https://credential-issuer.example.com/nonce",
             "batch_credential_endpoint": "https://credential-issuer.example.com/batch_credential",
             "deferred_credential_endpoint": "https://credential-issuer.example.com/deferred_credential",
             "credential_response_encryption": {
