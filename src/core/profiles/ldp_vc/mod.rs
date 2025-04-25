@@ -15,7 +15,6 @@ pub use credential_response::CredentialResponse;
 pub type AuthorizationDetailWithFormat =
     authorization_detail::AuthorizationDetailsObjectWithFormat<Format>;
 pub type CredentialConfiguration = credential_configuration::CredentialConfiguration<Format>;
-pub type CredentialRequestWithFormat = credential_request::CredentialRequestWithFormat<Format>;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub enum Format {

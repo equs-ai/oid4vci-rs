@@ -1,54 +1,28 @@
 use std::fmt::Debug;
 
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::profiles::CredentialRequestProfile;
 
 use super::{authorization_detail::CredentialDefinition, CredentialResponse};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct CredentialRequestWithFormat<F> {
-    format: F,
+pub struct CredentialRequest {
     credential_definition: CredentialDefinition,
 }
 
-impl<F> CredentialRequestWithFormat<F> {
-    pub fn new(credential_definition: CredentialDefinition) -> Self
-    where
-        F: Default,
-    {
+impl CredentialRequest {
+    pub fn new(credential_definition: CredentialDefinition) -> Self {
         Self {
-            format: F::default(),
             credential_definition,
         }
     }
+
     field_getters_setters![
-        pub self [self] ["request value"] {
+        pub self [self] ["W3C VC request value"] {
             set_credential_definition -> credential_definition[CredentialDefinition],
         }
     ];
-}
-
-impl<F> CredentialRequestProfile for CredentialRequestWithFormat<F>
-where
-    F: DeserializeOwned + Serialize + Debug + Clone,
-{
-    type Response = CredentialResponse;
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct CredentialRequest {}
-
-impl Default for CredentialRequest {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CredentialRequest {
-    pub fn new() -> Self {
-        Self {}
-    }
 }
 
 impl CredentialRequestProfile for CredentialRequest {
@@ -59,16 +33,12 @@ impl CredentialRequestProfile for CredentialRequest {
 mod test {
     use serde_json::json;
 
-    use crate::{
-        core::profiles::{ldp_vc::Format, CoreProfilesCredentialRequest},
-        credential::Request,
-    };
+    use crate::{core::profiles::CoreProfilesCredentialRequest, credential::Request};
 
     #[test]
     fn roundtrip_with_format() {
         let expected_json = json!(
             {
-                "format": "ldp_vc",
                 "credential_definition": {
                    "@context": [
                       "https://www.w3.org/2018/credentials/v1",
@@ -112,7 +82,7 @@ mod test {
             }
         );
 
-        let credential_request: Request<super::CredentialRequestWithFormat<Format>> =
+        let credential_request: Request<super::CredentialRequest> =
             serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&expected_json).unwrap(),
             ))

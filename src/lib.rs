@@ -25,9 +25,8 @@ pub use oauth2;
 mod test {
     use crate::core::profiles::{
         jwt_vc_json_ld, ldp_vc, CoreProfilesCredentialConfiguration, CoreProfilesCredentialRequest,
-        CredentialRequestWithFormat,
     };
-    use crate::core::{client::Client, metadata::CredentialIssuerMetadata};
+    use crate::core::{client::Client, metadata::CredentialIssuerMetadata, profiles};
     use crate::credential_offer::CredentialOffer;
     use crate::metadata::authorization_server::GrantType;
     use crate::metadata::credential_issuer::CredentialConfiguration;
@@ -112,7 +111,7 @@ mod test {
                     ldp_vc::authorization_detail::CredentialDefinition::default()
                         .set_context(config.credential_definition().context().clone())
                         .set_type(config.credential_definition().r#type().clone());
-                CredentialRequestWithFormat::LdpVc(ldp_vc::CredentialRequestWithFormat::new(
+                profiles::CredentialRequest::LdpVc(ldp_vc::CredentialRequest::new(
                     credential_definition,
                 ))
             }
@@ -121,9 +120,9 @@ mod test {
                     ldp_vc::authorization_detail::CredentialDefinition::default()
                         .set_context(config.credential_definition().context().clone())
                         .set_type(config.credential_definition().r#type().clone());
-                CredentialRequestWithFormat::JwtVcJsonLd(
-                    jwt_vc_json_ld::CredentialRequestWithFormat::new(credential_definition),
-                )
+                profiles::CredentialRequest::JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest::new(
+                    credential_definition,
+                ))
             }
             x => unimplemented!("{x:?}"),
         };
@@ -131,7 +130,7 @@ mod test {
         let credential_response = client
             .request_credential(
                 token_response.access_token().clone(),
-                CoreProfilesCredentialRequest::WithFormat {
+                CoreProfilesCredentialRequest::Default {
                     inner: request_inner,
                     _credential_identifier: (),
                 },

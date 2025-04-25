@@ -16,7 +16,6 @@ pub mod credential {
 
     pub type Request = credential::Request<CoreProfilesCredentialRequest>;
     pub type Response = credential::Response<CoreProfilesCredentialResponse>;
-    pub type BatchRequest = credential::BatchRequest<CoreProfilesCredentialRequest>;
 }
 
 pub mod authorization {

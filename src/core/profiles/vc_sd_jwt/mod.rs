@@ -7,10 +7,9 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-pub const FORMAT_IDENTIFIER: &str = "dc+sd-jwt";
 pub use authorization_detail::{AuthorizationDetailsObject, AuthorizationDetailsObjectWithFormat};
 pub use credential_configuration::CredentialConfiguration;
-pub use credential_request::{CredentialRequest, CredentialRequestWithFormat};
+pub use credential_request::CredentialRequest;
 pub use credential_response::CredentialResponse;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]

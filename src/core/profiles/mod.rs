@@ -90,11 +90,11 @@ pub enum AuthorizationDetailsObjectWithFormat {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum AuthorizationDetailsObjectWithCredentialConfigurationId {
-    JwtVcJson(jwt_vc_json::AuthorizationDetailsObject),
-    JwtVcJsonLd(jwt_vc_json_ld::AuthorizationDetailsObject),
+    VcSdJwt(vc_sd_jwt::AuthorizationDetailsObject),
     LdpVc(ldp_vc::AuthorizationDetailsObject),
     MsoMdoc(mso_mdoc::AuthorizationDetailsObject),
-    VcSdJwt(vc_sd_jwt::AuthorizationDetailsObject),
+    JwtVcJson(jwt_vc_json::AuthorizationDetailsObject),
+    JwtVcJsonLd(jwt_vc_json_ld::AuthorizationDetailsObject),
 }
 
 impl AuthorizationDetailsObjectProfile for CoreProfilesAuthorizationDetailsObject {}
@@ -102,9 +102,9 @@ impl AuthorizationDetailsObjectProfile for CoreProfilesAuthorizationDetailsObjec
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum CoreProfilesCredentialRequest {
-    WithFormat {
+    Default {
         #[serde(flatten)]
-        inner: CredentialRequestWithFormat,
+        inner: CredentialRequest,
         #[serde(
             default,
             skip_serializing,
@@ -146,22 +146,22 @@ impl CredentialRequestProfile for CoreProfilesCredentialRequest {
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
-pub enum CredentialRequestWithFormat {
-    JwtVcJson(jwt_vc_json::CredentialRequestWithFormat),
-    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequestWithFormat),
-    LdpVc(ldp_vc::CredentialRequestWithFormat),
-    MsoMdoc(mso_mdoc::CredentialRequestWithFormat),
-    VcSdJwt(vc_sd_jwt::CredentialRequestWithFormat),
+pub enum CredentialRequest {
+    VcSdJwt(vc_sd_jwt::CredentialRequest),
+    LdpVc(ldp_vc::CredentialRequest),
+    MsoMdoc(mso_mdoc::CredentialRequest),
+    JwtVcJson(jwt_vc_json::CredentialRequest),
+    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum CredentialRequestWithCredentialIdentifier {
-    JwtVcJson(jwt_vc_json::CredentialRequest),
-    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest),
+    VcSdJwt(vc_sd_jwt::CredentialRequest),
     LdpVc(ldp_vc::CredentialRequest),
     MsoMdoc(mso_mdoc::CredentialRequest),
-    VcSdJwt(vc_sd_jwt::CredentialRequest),
+    JwtVcJson(jwt_vc_json::CredentialRequest),
+    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -170,11 +170,21 @@ pub struct CoreProfilesCredentialResponse;
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum CoreProfilesCredentialResponseType {
-    VcSdJwt(<vc_sd_jwt::CredentialResponse as CredentialResponseProfile>::Type),
-    JwtVcJson(<jwt_vc_json::CredentialResponse as CredentialResponseProfile>::Type),
-    JwtVcJsonLd(<jwt_vc_json_ld::CredentialResponse as CredentialResponseProfile>::Type),
-    LdpVc(<ldp_vc::CredentialResponse as CredentialResponseProfile>::Type),
-    MsoMdoc(<mso_mdoc::CredentialResponse as CredentialResponseProfile>::Type),
+    VcSdJwt {
+        credential: <vc_sd_jwt::CredentialResponse as CredentialResponseProfile>::Type,
+    },
+    LdpVc {
+        credential: <ldp_vc::CredentialResponse as CredentialResponseProfile>::Type,
+    },
+    MsoMdoc {
+        credential: <mso_mdoc::CredentialResponse as CredentialResponseProfile>::Type,
+    },
+    JwtVcJson {
+        credential: <jwt_vc_json::CredentialResponse as CredentialResponseProfile>::Type,
+    },
+    JwtVcJsonLd {
+        credential: <jwt_vc_json_ld::CredentialResponse as CredentialResponseProfile>::Type,
+    },
 }
 
 impl CredentialResponseProfile for CoreProfilesCredentialResponse {
