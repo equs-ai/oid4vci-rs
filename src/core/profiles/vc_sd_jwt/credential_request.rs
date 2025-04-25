@@ -1,55 +1,21 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{core::profiles::CredentialConfigurationClaim, profiles::CredentialRequestProfile};
+use crate::profiles::CredentialRequestProfile;
 
-use super::{Claims, CredentialResponse, Format};
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct CredentialRequestWithFormat {
-    format: Format,
-    vct: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    claims: Option<Claims<CredentialConfigurationClaim>>,
-}
-
-impl CredentialRequestWithFormat {
-    pub fn new(vct: String, claims: Claims<CredentialConfigurationClaim>) -> Self {
-        Self {
-            format: Format::default(),
-            vct,
-            claims: Some(claims),
-        }
-    }
-    field_getters_setters![
-        pub self [self] ["VC SD-JWT request value"] {
-            set_vct -> vct[String],
-            set_claims -> claims[Option<Claims<CredentialConfigurationClaim>>],
-        }
-    ];
-}
-
-impl CredentialRequestProfile for CredentialRequestWithFormat {
-    type Response = CredentialResponse;
-}
+use super::CredentialResponse;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CredentialRequest {
     vct: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    claims: Option<Claims<CredentialConfigurationClaim>>,
 }
 
 impl CredentialRequest {
-    pub fn new(vct: String, claims: Claims<CredentialConfigurationClaim>) -> Self {
-        Self {
-            vct,
-            claims: Some(claims),
-        }
+    pub fn new(vct: String) -> Self {
+        Self { vct }
     }
     field_getters_setters![
         pub self [self] ["VC SD-JWT request value"] {
             set_vct -> vct[String],
-            set_claims -> claims[Option<Claims<CredentialConfigurationClaim>>],
         }
     ];
 }
@@ -68,7 +34,6 @@ mod test {
     fn roundtrip_with_format() {
         let expected_json = json!(
             {
-                "format": "dc+sd-jwt",
                 "vct": "SD_JWT_VC_example_in_OpenID4VCI",
                 "proof": {
                   "proof_type": "jwt",
@@ -77,7 +42,7 @@ mod test {
             }
         );
 
-        let credential_request: Request<super::CredentialRequestWithFormat> =
+        let credential_request: Request<super::CredentialRequest> =
             serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&expected_json).unwrap(),
             ))

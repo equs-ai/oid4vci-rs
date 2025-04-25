@@ -2,44 +2,18 @@ use serde::{Deserialize, Serialize};
 
 use crate::profiles::CredentialRequestProfile;
 
-use super::{authorization_detail::CredentialDefinition, CredentialResponse, Format};
+use super::{authorization_detail::CredentialDefinition, CredentialResponse};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct CredentialRequestWithFormat {
-    format: Format,
+pub struct CredentialRequest {
     credential_definition: CredentialDefinition,
 }
 
-impl CredentialRequestWithFormat {
+impl CredentialRequest {
     pub fn new(credential_definition: CredentialDefinition) -> Self {
         Self {
-            format: Format::default(),
             credential_definition,
         }
-    }
-    field_getters_setters![
-        pub self [self] ["JWT VC request value"] {
-            set_credential_definition -> credential_definition[CredentialDefinition],
-        }
-    ];
-}
-
-impl CredentialRequestProfile for CredentialRequestWithFormat {
-    type Response = CredentialResponse;
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct CredentialRequest {}
-
-impl Default for CredentialRequest {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl CredentialRequest {
-    pub fn new() -> Self {
-        Self {}
     }
 }
 
@@ -57,7 +31,6 @@ mod test {
     fn roundtrip_with_format() {
         let expected_json = json!(
             {
-                "format": "jwt_vc_json",
                 "credential_definition": {
                     "type": [
                         "VerifiableCredential",
@@ -76,7 +49,7 @@ mod test {
             }
         );
 
-        let credential_request: Request<super::CredentialRequestWithFormat> =
+        let credential_request: Request<super::CredentialRequest> =
             serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
                 &serde_json::to_string(&expected_json).unwrap(),
             ))

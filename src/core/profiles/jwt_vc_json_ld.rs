@@ -11,8 +11,6 @@ pub type AuthorizationDetailWithFormat =
     super::ldp_vc::authorization_detail::AuthorizationDetailsObjectWithFormat<Format>;
 pub type CredentialConfiguration =
     super::ldp_vc::credential_configuration::CredentialConfiguration<Format>;
-pub type CredentialRequestWithFormat =
-    super::ldp_vc::credential_request::CredentialRequestWithFormat<Format>;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub enum Format {

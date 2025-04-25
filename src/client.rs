@@ -21,10 +21,7 @@ use crate::{
     profiles::Profile,
     pushed_authorization::PushedAuthorizationRequest,
     token,
-    types::{
-        BatchCredentialUrl, CredentialUrl, DeferredCredentialUrl, IssuerUrl, ParUrl,
-        PreAuthorizedCode,
-    },
+    types::{CredentialUrl, DeferredCredentialUrl, IssuerUrl, ParUrl, PreAuthorizedCode},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -59,7 +56,6 @@ where
     credential_endpoint: CredentialUrl,
     nonce_endpoint: Option<NonceUrl>,
     par_auth_url: Option<ParUrl>,
-    batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
     credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
     credential_configurations_supported: Vec<CredentialConfiguration<C::CredentialConfiguration>>,
@@ -74,7 +70,6 @@ where
         pub self [self] ["client configuration value"] {
             set_issuer -> issuer[IssuerUrl],
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
-            set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryptionMetadata>],
             set_credential_configurations_supported -> credential_configurations_supported[Vec<CredentialConfiguration<C::CredentialConfiguration>>],
@@ -102,9 +97,6 @@ where
             nonce_endpoint: credential_issuer_metadata.nonce_endpoint().cloned(),
             par_auth_url: authorization_metadata
                 .pushed_authorization_request_endpoint()
-                .cloned(),
-            batch_credential_endpoint: credential_issuer_metadata
-                .batch_credential_endpoint()
                 .cloned(),
             deferred_credential_endpoint: credential_issuer_metadata
                 .deferred_credential_endpoint()
@@ -191,27 +183,6 @@ where
         }
 
         None
-    }
-
-    pub fn batch_request_credential(
-        &self,
-        access_token: AccessToken,
-        profile_fields: Vec<C::CredentialRequest>,
-    ) -> Result<credential::BatchRequestBuilder<C::CredentialRequest>, Error> {
-        let Some(endpoint) = self.batch_credential_endpoint() else {
-            return Err(Error::BcrUnsupported);
-        };
-        let body = credential::BatchRequest::new(
-            profile_fields
-                .into_iter()
-                .map(credential::Request::new)
-                .collect(),
-        );
-        Ok(credential::BatchRequestBuilder::new(
-            body,
-            endpoint.clone(),
-            access_token,
-        ))
     }
 
     fn new_inner_client(

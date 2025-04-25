@@ -10,8 +10,8 @@ use crate::{
     profiles::CredentialConfigurationProfile,
     proof_of_possession::KeyProofTypesSupported,
     types::{
-        BatchCredentialUrl, CredentialConfigurationId, CredentialUrl, DeferredCredentialUrl,
-        IssuerUrl, LanguageTag, LogoUri, NotificationUrl,
+        CredentialConfigurationId, CredentialUrl, DeferredCredentialUrl, IssuerUrl, LanguageTag,
+        LogoUri, NotificationUrl,
     },
 };
 
@@ -26,7 +26,6 @@ where
     authorization_servers: Option<Vec<IssuerUrl>>,
     credential_endpoint: CredentialUrl,
     nonce_endpoint: Option<NonceUrl>,
-    batch_credential_endpoint: Option<BatchCredentialUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
     notification_endpoint: Option<NotificationUrl>,
     credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
@@ -66,7 +65,6 @@ where
             authorization_servers: None,
             credential_endpoint,
             nonce_endpoint: None,
-            batch_credential_endpoint: None,
             deferred_credential_endpoint: None,
             notification_endpoint: None,
             credential_response_encryption: None,
@@ -83,7 +81,6 @@ where
             set_authorization_servers -> authorization_servers[Option<Vec<IssuerUrl>>],
             set_credential_endpoint -> credential_endpoint[CredentialUrl],
             set_nonce_endpoint -> nonce_endpoint[Option<NonceUrl>],
-            set_batch_credential_endpoint -> batch_credential_endpoint[Option<BatchCredentialUrl>],
             set_deferred_credential_endpoint -> deferred_credential_endpoint[Option<DeferredCredentialUrl>],
             set_notification_endpoint -> notification_endpoint[Option<NotificationUrl>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryptionMetadata>],
