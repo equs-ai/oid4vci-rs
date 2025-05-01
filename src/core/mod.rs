@@ -12,9 +12,9 @@ pub mod metadata {
 pub mod credential {
     use crate::credential;
 
-    use super::profiles::{CoreProfilesCredentialRequest, CoreProfilesCredentialResponse};
+    use super::profiles::CoreProfilesCredentialResponse;
 
-    pub type Request = credential::Request<CoreProfilesCredentialRequest>;
+    pub type Request = credential::Request;
     pub type Response = credential::Response<CoreProfilesCredentialResponse>;
 }
 

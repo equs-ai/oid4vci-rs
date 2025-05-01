@@ -23,10 +23,8 @@ pub use oauth2;
 
 #[cfg(test)]
 mod test {
-    use crate::core::profiles::{
-        jwt_vc_json_ld, ldp_vc, CoreProfilesCredentialConfiguration, CoreProfilesCredentialRequest,
-    };
-    use crate::core::{client::Client, metadata::CredentialIssuerMetadata, profiles};
+    use crate::core::profiles::{CoreProfilesCredentialConfiguration, CoreProfilesCredentialResponse};
+    use crate::core::{client::Client, metadata::CredentialIssuerMetadata};
     use crate::credential_offer::CredentialOffer;
     use crate::metadata::authorization_server::GrantType;
     use crate::metadata::credential_issuer::CredentialConfiguration;
@@ -34,6 +32,7 @@ mod test {
     use crate::types::CredentialOfferRequest;
     use oauth2::{ClientId, RedirectUrl, TokenResponse};
     use url::Url;
+    use crate::credential::CredentialId;
 
     #[tokio::test]
     #[ignore]
@@ -105,35 +104,11 @@ mod test {
             .unwrap();
 
         let credential_configuration = &targeted_credentials[0];
-        let request_inner = match credential_configuration.profile_specific_fields() {
-            CoreProfilesCredentialConfiguration::LdpVc(config) => {
-                let credential_definition =
-                    ldp_vc::authorization_detail::CredentialDefinition::default()
-                        .set_context(config.credential_definition().context().clone())
-                        .set_type(config.credential_definition().r#type().clone());
-                profiles::CredentialRequest::LdpVc(ldp_vc::CredentialRequest::new(
-                    credential_definition,
-                ))
-            }
-            CoreProfilesCredentialConfiguration::JwtVcJsonLd(config) => {
-                let credential_definition =
-                    ldp_vc::authorization_detail::CredentialDefinition::default()
-                        .set_context(config.credential_definition().context().clone())
-                        .set_type(config.credential_definition().r#type().clone());
-                profiles::CredentialRequest::JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest::new(
-                    credential_definition,
-                ))
-            }
-            x => unimplemented!("{x:?}"),
-        };
 
-        let credential_response = client
+        let credential_response: crate::credential::Response<CoreProfilesCredentialResponse> = client
             .request_credential(
                 token_response.access_token().clone(),
-                CoreProfilesCredentialRequest::Default {
-                    inner: request_inner,
-                    _credential_identifier: (),
-                },
+                CredentialId::CredentialConfigurationId(credential_configuration.id().to_owned())
             )
             .request_async(&http_client)
             .await

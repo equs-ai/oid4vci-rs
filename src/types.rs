@@ -424,6 +424,14 @@ new_type![
 ];
 
 new_type![
+    /// A unique identifier of the supported Credential being described.
+    /// This identifier is used in the Credential Offer to communicate to the Wallet which
+    /// Credential is being offered.
+    #[derive(Deserialize, Serialize, Eq, Hash)]
+    CredentialIdentifier(String)
+];
+
+new_type![
     /// String value determining the type of value of the claim. Valid values defined by OID4VCI
     /// are `string`, `number`, and image media types such as `image/jpeg` as defined in [IANA media
     /// type registry for images](

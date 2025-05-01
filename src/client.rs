@@ -171,9 +171,9 @@ where
     pub fn request_credential(
         &self,
         access_token: AccessToken,
-        profile_fields: C::CredentialRequest,
-    ) -> credential::RequestBuilder<C::CredentialRequest> {
-        let body = credential::Request::new(profile_fields);
+        credential_id: credential::CredentialId,
+    ) -> credential::RequestBuilder {
+        let body = credential::Request::new(credential_id);
         credential::RequestBuilder::new(body, self.credential_endpoint().clone(), access_token)
     }
 

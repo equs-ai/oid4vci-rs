@@ -14,31 +14,51 @@ use serde::{Deserialize, Serialize};
 use crate::{
     credential_response_encryption::CredentialResponseEncryption,
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
-    profiles::{CredentialRequestProfile, CredentialResponseProfile},
-    proof_of_possession::Proof,
-    types::CredentialUrl,
+    profiles::CredentialResponseProfile,
+    proof_of_possession,
+    types::{CredentialConfigurationId, CredentialIdentifier, CredentialUrl},
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Request<CR>
-where
-    CR: CredentialRequestProfile,
+pub struct Request
 {
-    #[serde(flatten, bound = "CR: CredentialRequestProfile")]
-    additional_profile_fields: CR,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    credential_id: CredentialId,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
     proof: Option<Proof>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_response_encryption: Option<CredentialResponseEncryption>,
 }
 
-impl<CR> Request<CR>
-where
-    CR: CredentialRequestProfile,
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum CredentialId {
+    #[serde(rename = "credential_identifier")]
+    CredentialIdentifier(CredentialIdentifier),
+    #[serde(rename = "credential_configuration_id")]
+    CredentialConfigurationId(CredentialConfigurationId),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum Proof {
+    #[serde(rename = "proof")]
+    One(proof_of_possession::Proof),
+    #[serde(rename = "proofs")]
+    Many(ProofMany),
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum ProofMany {
+    #[serde(rename = "jwt")]
+    Jwt(Vec<String>),
+    #[serde(rename = "ldp_vp")]
+    LdpVp(Vec<serde_json::Value>),
+}
+
+impl Request
 {
-    pub(crate) fn new(additional_profile_fields: CR) -> Self {
+    pub(crate) fn new(credential_id: CredentialId) -> Self {
         Self {
-            additional_profile_fields,
+            credential_id,
             proof: None,
             credential_response_encryption: None,
         }
@@ -46,27 +66,22 @@ where
 
     field_getters_setters![
         pub self [self] ["credential request value"] {
-            set_additional_profile_fields -> additional_profile_fields[CR],
             set_proof -> proof[Option<Proof>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption>],
         }
     ];
 }
 
-pub struct RequestBuilder<CR>
-where
-    CR: CredentialRequestProfile,
+pub struct RequestBuilder
 {
-    body: Request<CR>,
+    body: Request,
     url: CredentialUrl,
     access_token: AccessToken,
 }
 
-impl<CR> RequestBuilder<CR>
-where
-    CR: CredentialRequestProfile,
+impl RequestBuilder
 {
-    pub(crate) fn new(body: Request<CR>, url: CredentialUrl, access_token: AccessToken) -> Self {
+    pub(crate) fn new(body: Request, url: CredentialUrl, access_token: AccessToken) -> Self {
         Self {
             body,
             url,
@@ -76,18 +91,18 @@ where
 
     field_getters_setters![
         pub self [self.body] ["credential request value"] {
-            set_additional_profile_fields -> additional_profile_fields[CR],
             set_proof -> proof[Option<Proof>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption>],
         }
     ];
 
-    pub fn request<C>(
+    pub fn request<C, CR>(
         self,
         http_client: &C,
-    ) -> Result<Response<CR::Response>, RequestError<<C as SyncHttpClient>::Error>>
+    ) -> Result<Response<CR>, RequestError<<C as SyncHttpClient>::Error>>
     where
         C: SyncHttpClient,
+        CR: CredentialResponseProfile,
     {
         http_client
             .call(self.prepare_request().map_err(|err| {
@@ -97,15 +112,16 @@ where
             .and_then(|http_response| self.credential_response(http_response))
     }
 
-    pub fn request_async<'c, C>(
+    pub fn request_async<'c, C, CR>(
         self,
         http_client: &'c C,
     ) -> impl Future<
-        Output = Result<Response<CR::Response>, RequestError<<C as AsyncHttpClient<'c>>::Error>>,
+        Output = Result<Response<CR>, RequestError<<C as AsyncHttpClient<'c>>::Error>>,
     > + 'c
     where
         Self: 'c,
         C: AsyncHttpClient<'c>,
+        CR: CredentialResponseProfile,
     {
         Box::pin(async move {
             let http_response = http_client
@@ -131,12 +147,13 @@ where
             .map_err(RequestError::Request)
     }
 
-    fn credential_response<RE>(
+    fn credential_response<RE, CR>(
         self,
         http_response: HttpResponse,
-    ) -> Result<Response<CR::Response>, RequestError<RE>>
+    ) -> Result<Response<CR>, RequestError<RE>>
     where
         RE: std::error::Error + 'static,
+        CR: CredentialResponseProfile,
     {
         // TODO status 202 if deferred
         if http_response.status() != StatusCode::OK {
@@ -255,14 +272,9 @@ mod test {
     use super::*;
 
     #[test]
-    fn example_credential_request_object() {
+    fn example_credential_request_with_credential_identifier() {
         let _: crate::core::credential::Request = serde_json::from_value(json!({
-            "credential_definition": {
-             "type": [
-                 "VerifiableCredential",
-                 "UniversityDegreeCredential"
-             ]
-            },
+            "credential_identifier": "CivilEngineeringDegree-2023",
             "proof": {
                "proof_type": "jwt",
                "jwt": "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8
@@ -275,9 +287,9 @@ mod test {
     }
 
     #[test]
-    fn example_credential_request_referenced() {
+    fn example_credential_request_with_credential_configuration_id() {
         let _: crate::core::credential::Request = serde_json::from_value(json!({
-            "credential_identifier": "UniversityDegreeCredential",
+            "credential_configuration_id": "dc+sd-jwt-1",
             "proof": {
                "proof_type": "jwt",
                "jwt": "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8
@@ -290,21 +302,17 @@ mod test {
     }
 
     #[test]
-    fn example_credential_request_deny() {
-        assert!(
-            serde_json::from_value::<crate::core::credential::Request>(json!({
-                "format": "jwt_vc_json",
-                "credential_identifier": "UniversityDegreeCredential",
-                "proof": {
-                   "proof_type": "jwt",
-                   "jwt": "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8
-               xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJzNkJoZFJrcXQzIiwiYXVkIjoiaHR
-               0cHM6Ly9zZXJ2ZXIuZXhhbXBsZS5jb20iLCJpYXQiOjE1MzY5NTk5NTksIm5vbmNlIjoidFppZ25zbk
-               ZicCJ9.ewdkIkPV50iOeBUqMXCC_aZKPxgihac0aW9EkL1nOzM"
-                }
-            }))
-            .is_err()
-        );
+    fn example_credential_request_with_multiple_proofs() {
+        let _: crate::core::credential::Request = serde_json::from_value(json!({
+            "credential_configuration_id": "dc+sd-jwt-1",
+            "proofs": {
+                "jwt": [
+                  "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ",
+                  "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ"
+                ]
+            }
+        }))
+        .unwrap();
     }
 
     #[test]

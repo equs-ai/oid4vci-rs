@@ -1,6 +1,5 @@
 pub mod authorization_detail;
 pub mod credential_configuration;
-pub mod credential_request;
 pub mod credential_response;
 
 use std::collections::HashMap;
@@ -9,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 pub const FORMAT_IDENTIFIER: &str = "ldp_vc";
 pub use authorization_detail::AuthorizationDetailsObject;
-pub use credential_request::CredentialRequest;
 pub use credential_response::CredentialResponse;
 
 pub type AuthorizationDetailWithFormat =
