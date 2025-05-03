@@ -23,8 +23,11 @@ pub use oauth2;
 
 #[cfg(test)]
 mod test {
-    use crate::core::profiles::{CoreProfilesCredentialConfiguration, CoreProfilesCredentialResponse};
+    use crate::core::profiles::{
+        CoreProfilesCredentialConfiguration, CoreProfilesCredentialResponse,
+    };
     use crate::core::{client::Client, metadata::CredentialIssuerMetadata};
+    use crate::credential::CredentialId;
     use crate::credential_offer::CredentialOffer;
     use crate::metadata::authorization_server::GrantType;
     use crate::metadata::credential_issuer::CredentialConfiguration;
@@ -32,7 +35,6 @@ mod test {
     use crate::types::CredentialOfferRequest;
     use oauth2::{ClientId, RedirectUrl, TokenResponse};
     use url::Url;
-    use crate::credential::CredentialId;
 
     #[tokio::test]
     #[ignore]
@@ -105,14 +107,17 @@ mod test {
 
         let credential_configuration = &targeted_credentials[0];
 
-        let credential_response: crate::credential::Response<CoreProfilesCredentialResponse> = client
-            .request_credential(
-                token_response.access_token().clone(),
-                CredentialId::CredentialConfigurationId(credential_configuration.id().to_owned())
-            )
-            .request_async(&http_client)
-            .await
-            .unwrap();
+        let credential_response: crate::credential::Response<CoreProfilesCredentialResponse> =
+            client
+                .request_credential(
+                    token_response.access_token().clone(),
+                    CredentialId::CredentialConfigurationId(
+                        credential_configuration.id().to_owned(),
+                    ),
+                )
+                .request_async(&http_client)
+                .await
+                .unwrap();
 
         println!("{credential_response:?}")
     }

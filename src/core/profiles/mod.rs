@@ -99,7 +99,6 @@ pub enum AuthorizationDetailsObjectWithCredentialConfigurationId {
 
 impl AuthorizationDetailsObjectProfile for CoreProfilesAuthorizationDetailsObject {}
 
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CoreProfilesCredentialResponse;
 

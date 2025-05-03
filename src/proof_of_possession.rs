@@ -26,8 +26,6 @@ pub struct KeyProofTypesSupported {
 pub enum KeyProofType {
     #[serde(rename = "jwt")]
     Jwt,
-    #[serde(rename = "cwt")]
-    Cwt,
     #[serde(rename = "ldp_vp")]
     LdpVp,
 }

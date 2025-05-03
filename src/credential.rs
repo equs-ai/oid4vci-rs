@@ -20,10 +20,9 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Request
-{
+pub struct Request {
     #[serde(flatten)]
-    credential_id: CredentialId,
+    pub credential_id: CredentialId,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     proof: Option<Proof>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -54,8 +53,16 @@ pub enum ProofMany {
     LdpVp(Vec<serde_json::Value>),
 }
 
-impl Request
-{
+impl ProofMany {
+    pub fn len(&self) -> usize {
+        match self {
+            ProofMany::Jwt(proofs) => proofs.len(),
+            ProofMany::LdpVp(proofs) => proofs.len(),
+        }
+    }
+}
+
+impl Request {
     pub(crate) fn new(credential_id: CredentialId) -> Self {
         Self {
             credential_id,
@@ -72,15 +79,13 @@ impl Request
     ];
 }
 
-pub struct RequestBuilder
-{
+pub struct RequestBuilder {
     body: Request,
     url: CredentialUrl,
     access_token: AccessToken,
 }
 
-impl RequestBuilder
-{
+impl RequestBuilder {
     pub(crate) fn new(body: Request, url: CredentialUrl, access_token: AccessToken) -> Self {
         Self {
             body,
@@ -115,9 +120,7 @@ impl RequestBuilder
     pub fn request_async<'c, C, CR>(
         self,
         http_client: &'c C,
-    ) -> impl Future<
-        Output = Result<Response<CR>, RequestError<<C as AsyncHttpClient<'c>>::Error>>,
-    > + 'c
+    ) -> impl Future<Output = Result<Response<CR>, RequestError<<C as AsyncHttpClient<'c>>::Error>>> + 'c
     where
         Self: 'c,
         C: AsyncHttpClient<'c>,
