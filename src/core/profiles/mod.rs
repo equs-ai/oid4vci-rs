@@ -6,10 +6,11 @@ use serde_json::Value;
 use crate::{
     profiles::{
         AuthorizationDetailsObjectProfile, CredentialConfigurationProfile,
-        CredentialRequestProfile, CredentialResponseProfile, Profile,
+        CredentialResponseProfile, Profile,
     },
     types::{ClaimValueType, CredentialConfigurationId, LanguageTag},
 };
+
 pub mod jwt_vc_json;
 pub mod jwt_vc_json_ld;
 pub mod ldp_vc;
@@ -20,7 +21,6 @@ pub struct CoreProfiles;
 impl Profile for CoreProfiles {
     type CredentialConfiguration = CoreProfilesCredentialConfiguration;
     type AuthorizationDetailsObject = CoreProfilesAuthorizationDetailsObject;
-    type CredentialRequest = CoreProfilesCredentialRequest;
     type CredentialResponse = CoreProfilesCredentialResponse;
 }
 
@@ -98,71 +98,6 @@ pub enum AuthorizationDetailsObjectWithCredentialConfigurationId {
 }
 
 impl AuthorizationDetailsObjectProfile for CoreProfilesAuthorizationDetailsObject {}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum CoreProfilesCredentialRequest {
-    Default {
-        #[serde(flatten)]
-        inner: CredentialRequest,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "credential_identifier"
-        )]
-        _credential_identifier: (),
-    },
-    WithIdAndUnresolvedProfile {
-        credential_identifier: CredentialConfigurationId,
-        #[serde(flatten)]
-        inner: HashMap<String, Value>,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "format"
-        )]
-        _format: (),
-    },
-    #[serde(skip_deserializing)]
-    WithId {
-        credential_identifier: CredentialConfigurationId,
-        #[serde(flatten)]
-        inner: CredentialRequestWithCredentialIdentifier,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "format"
-        )]
-        _format: (),
-    },
-}
-
-impl CredentialRequestProfile for CoreProfilesCredentialRequest {
-    type Response = CoreProfilesCredentialResponse;
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum CredentialRequest {
-    VcSdJwt(vc_sd_jwt::CredentialRequest),
-    LdpVc(ldp_vc::CredentialRequest),
-    MsoMdoc(mso_mdoc::CredentialRequest),
-    JwtVcJson(jwt_vc_json::CredentialRequest),
-    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest),
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum CredentialRequestWithCredentialIdentifier {
-    VcSdJwt(vc_sd_jwt::CredentialRequest),
-    LdpVc(ldp_vc::CredentialRequest),
-    MsoMdoc(mso_mdoc::CredentialRequest),
-    JwtVcJson(jwt_vc_json::CredentialRequest),
-    JwtVcJsonLd(jwt_vc_json_ld::CredentialRequest),
-}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CoreProfilesCredentialResponse;

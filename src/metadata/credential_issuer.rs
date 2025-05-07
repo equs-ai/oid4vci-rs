@@ -35,6 +35,7 @@ where
     #[serde(default = "Vec::new", bound = "CM: CredentialConfigurationProfile")]
     #[serde_as(as = "KeyValueMap<_>")]
     credential_configurations_supported: Vec<CredentialConfiguration<CM>>,
+    batch_credential_issuance: Option<BatchCredentialIssuance>,
 }
 
 impl<CM> MetadataDiscovery for CredentialIssuerMetadata<CM>
@@ -72,6 +73,7 @@ where
             signed_metadata: None,
             display: None,
             credential_configurations_supported: vec![],
+            batch_credential_issuance: None,
         }
     }
 
@@ -88,6 +90,7 @@ where
             set_signed_metadata -> signed_metadata[Option<String>],
             set_display -> display[Option<Vec<CredentialIssuerMetadataDisplay>>],
             set_credential_configurations_supported -> credential_configurations_supported[Vec<CredentialConfiguration<CM>>],
+            set_batch_credential_issuance -> batch_credential_issuance[Option<BatchCredentialIssuance>],
         }
     ];
 }
@@ -267,6 +270,11 @@ impl MetadataBackgroundImage {
     ];
 }
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct BatchCredentialIssuance {
+    pub batch_size: u32,
+}
+
 #[cfg(test)]
 mod test {
     use crate::core::profiles::CoreProfilesCredentialConfiguration;
@@ -283,7 +291,9 @@ mod test {
             "authorization_servers": [ "https://server.example.com" ],
             "credential_endpoint": "https://credential-issuer.example.com",
             "nonce_endpoint": "https://credential-issuer.example.com/nonce",
-            "batch_credential_endpoint": "https://credential-issuer.example.com/batch_credential",
+            "batch_credential_issuance": {
+                "batch_size": 2
+            },
             "deferred_credential_endpoint": "https://credential-issuer.example.com/deferred_credential",
             "credential_response_encryption": {
                 "alg_values_supported" : [
