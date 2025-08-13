@@ -45,3 +45,4 @@ did-method-key = "0.3.1"
 ssi-verification-methods = "0.1.2"
 tokio = { version = "1.25.0", features = ["macros"] }
 oid4vci = { path = ".", features = ["reqwest"] }
+rstest = "0.26.1"
