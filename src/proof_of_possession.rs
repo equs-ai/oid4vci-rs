@@ -1,4 +1,4 @@
-// use async_trait::async_trait;
+use std::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
@@ -51,6 +51,7 @@ pub struct ProofOfPossessionBody {
         skip_serializing_if = "Option::is_none",
         with = "time::serde::timestamp::option"
     )]
+    #[serde(default)]
     pub not_before: Option<OffsetDateTime>,
     #[serde(rename = "iat")]
     #[serde(
@@ -81,6 +82,41 @@ pub struct ProofOfPossessionParams {
     pub issuer: Option<String>,
     pub nonce: Option<Nonce>,
     pub controller: ProofOfPossessionController,
+    pub not_before: Option<ProofOfPossessionNotBefore>,
+}
+
+/// Configures how Not Before claim (see [RFC7519](https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.5)) must be specified.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProofOfPossessionNotBefore {
+    /// Sets nbf the same as iat.
+    AsIssuedAt,
+    /// Sets nbf to provided timestamp.
+    Fixed(OffsetDateTime),
+    /// Sets nbf with a given delay from iat.
+    ///
+    /// Example:
+    ///     `iat` is 10:00:00;
+    ///     `delay` is 5 min;
+    ///     then `nbf` will be 10:05:00.
+    Delay(Duration),
+    /// Sets nbf with a given leeway from iat.
+    ///
+    /// Example:
+    ///     `iat` is 10:00:00
+    ///     `leeway` is 5 min
+    ///     then `nbf` will be 9:55:00
+    Leeway(Duration),
+}
+
+impl ProofOfPossessionNotBefore {
+    pub(crate) fn gen_relative_to(&self, issued_at: &OffsetDateTime) -> OffsetDateTime {
+        match self {
+            ProofOfPossessionNotBefore::AsIssuedAt => issued_at.clone(),
+            ProofOfPossessionNotBefore::Fixed(fixed) => fixed.clone(),
+            ProofOfPossessionNotBefore::Delay(delay) => issued_at.add(delay.to_owned()),
+            ProofOfPossessionNotBefore::Leeway(leeway) => issued_at.sub(leeway.to_owned()),
+        }
+    }
 }
 
 pub struct ProofOfPossessionVerificationParams {
@@ -95,7 +131,7 @@ pub struct ProofOfPossessionVerificationParams {
     pub exp_tolerance: Option<Duration>,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 pub enum VerificationError {
     #[error("proof of possession is not yet valid")]
     NotYetValid,
@@ -133,9 +169,11 @@ pub enum ParsingError {
     InvalidJWSType { actual: String, expected: String },
     #[error("JWS does not specify an algorithm")]
     MissingJWSAlg,
-    #[error("Missing key parameter, exactly one of the following parameters needs to be present: (kid, jwk, x5c)")]
+    #[error("Missing key parameter, exactly one of the following parameters needs to be present: (kid, jwk, x5c)"
+    )]
     MissingKeyParameters,
-    #[error("Too many key parameters specified, exactly one of the following parameters needs to be present: (kid, jwk, x5c)")]
+    #[error("Too many key parameters specified, exactly one of the following parameters needs to be present: (kid, jwk, x5c)"
+    )]
     TooManyKeyParameters,
     #[error("Could not retrieve JWK from KID: {0}")]
     KIDDereferenceError(String),
@@ -147,22 +185,34 @@ pub enum ParsingError {
     ProofValidationError(#[from] ssi_claims::ProofValidationError),
 }
 
-// #[async_trait]
-// pub trait Signer: Sync + Send {
-//     async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, jws::Error>;
-// }
-
 impl ProofOfPossession {
     pub fn generate(params: &ProofOfPossessionParams, expiry: Duration) -> Self {
         let now = OffsetDateTime::now_utc();
-        let exp = now + expiry;
+        Self::generate_at(params, now, expiry)
+    }
+
+    fn generate_at(
+        params: &ProofOfPossessionParams,
+        issued_at: OffsetDateTime,
+        lifetime: Duration,
+    ) -> Self {
+        let not_before = params
+            .not_before
+            .as_ref()
+            .map(|nbf| nbf.gen_relative_to(&issued_at));
+
+        let expires_at = if let Some(nbf) = not_before {
+            issued_at.max(nbf) + lifetime
+        } else {
+            issued_at + lifetime
+        };
         Self {
             body: ProofOfPossessionBody {
                 issuer: params.issuer.clone(),
                 audience: params.audience.clone(),
-                not_before: Some(now),
-                issued_at: Some(now),
-                expires_at: exp,
+                not_before,
+                issued_at: Some(issued_at),
+                expires_at,
                 nonce: params.nonce.clone(),
             },
             controller: params.controller.clone(),
@@ -296,7 +346,14 @@ impl ProofOfPossession {
         params: &ProofOfPossessionVerificationParams,
     ) -> Result<(), VerificationError> {
         let now = OffsetDateTime::now_utc();
+        self.verify_at(params, now).await
+    }
 
+    async fn verify_at(
+        &self,
+        params: &ProofOfPossessionVerificationParams,
+        now: OffsetDateTime,
+    ) -> Result<(), VerificationError> {
         let nbf_tolerance = params.nbf_tolerance.unwrap_or_default();
         let exp_tolerance = params.exp_tolerance.unwrap_or_default();
 
@@ -345,11 +402,11 @@ impl ProofOfPossession {
         Ok(())
     }
 }
-
 #[cfg(test)]
 mod test {
     use did_jwk::DIDJWK;
     use did_method_key::DIDKey;
+    use rstest::*;
     use serde_json::json;
     use ssi_dids_core::{DIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
@@ -357,32 +414,79 @@ mod test {
 
     use super::*;
 
-    fn generate_pop(expires_in: Duration) -> (ProofOfPossession, DIDURLBuf) {
-        let jwk: JWK = serde_json::from_value(json!({"kty":"OKP","crv":"Ed25519","x":"h3GzIK3pU8oTspVBKstiPSHR3VH_USS2FA0NrAOZ51s","d":"pfYMFvJ-LlMO4-EBBsrjpfAVz5UEYNVgbTphLPZypbE"})).unwrap();
-        let did_url = DIDJWK::generate_url(&jwk);
+    #[fixture]
+    fn issuer() -> String {
+        "TEST_ISSUER".to_owned()
+    }
 
-        (
-            ProofOfPossession::generate(
-                &ProofOfPossessionParams {
-                    issuer: Some("test".to_string()),
-                    audience: "http://localhost:300".to_string(),
-                    nonce: None,
-                    controller: ProofOfPossessionController {
-                        jwk,
-                        vm: Some(did_url.clone()),
-                    },
-                },
-                expires_in,
-            ),
-            did_url,
-        )
+    #[fixture]
+    fn audience() -> String {
+        "http://localhost:300".to_owned()
+    }
+
+    #[fixture]
+    fn jwk() -> JWK {
+        serde_json::from_value(json!({"kty":"OKP","crv":"Ed25519","x":"h3GzIK3pU8oTspVBKstiPSHR3VH_USS2FA0NrAOZ51s","d":"pfYMFvJ-LlMO4-EBBsrjpfAVz5UEYNVgbTphLPZypbE"})).unwrap()
+    }
+
+    #[fixture]
+    fn nonce() -> Option<Nonce> {
+        None
+    }
+
+    #[fixture]
+    fn did_url(jwk: JWK) -> DIDURLBuf {
+        DIDJWK::generate_url(&jwk)
+    }
+
+    #[fixture]
+    fn pop_params(
+        issuer: String,
+        audience: String,
+        nonce: Option<Nonce>,
+        jwk: JWK,
+        did_url: DIDURLBuf,
+    ) -> ProofOfPossessionParams {
+        ProofOfPossessionParams {
+            issuer: Some(issuer),
+            audience,
+            nonce,
+            controller: ProofOfPossessionController {
+                jwk,
+                vm: Some(did_url.clone()),
+            },
+            not_before: None,
+        }
+    }
+
+    #[fixture]
+    fn pop_verification_params(
+        #[default(None)] nbf_tolerance: Option<Duration>,
+        #[default(None)] exp_tolerance: Option<Duration>,
+        issuer: String,
+        audience: String,
+        nonce: Option<Nonce>,
+        did_url: DIDURLBuf,
+    ) -> ProofOfPossessionVerificationParams {
+        ProofOfPossessionVerificationParams {
+            issuer: Some(issuer),
+            nonce,
+            audience,
+            controller_did: Some(did_url),
+            controller_jwk: None,
+            nbf_tolerance,
+            exp_tolerance,
+        }
     }
 
     #[tokio::test]
-    async fn basic() {
+    #[rstest]
+    async fn basic(
+        pop_params: ProofOfPossessionParams,
+        pop_verification_params: ProofOfPossessionVerificationParams,
+    ) {
         let expires_in = Duration::minutes(5);
-
-        let (pop, did) = generate_pop(expires_in);
+        let pop = ProofOfPossession::generate(&pop_params, expires_in);
 
         let pop_jwt = pop.to_jwt().unwrap();
 
@@ -391,17 +495,7 @@ mod test {
             .await
             .unwrap();
 
-        pop.verify(&ProofOfPossessionVerificationParams {
-            nonce: pop.body.nonce.clone(),
-            audience: pop.body.audience.clone(),
-            issuer: Some("test".to_string()),
-            controller_did: Some(did),
-            controller_jwk: None,
-            nbf_tolerance: None,
-            exp_tolerance: None,
-        })
-        .await
-        .unwrap();
+        pop.verify(&pop_verification_params).await.unwrap();
     }
 
     #[tokio::test]
@@ -412,13 +506,13 @@ mod test {
         let pop_jwt = ProofOfPossession::generate(
             &ProofOfPossessionParams {
                 issuer: Some("test".to_string()),
-                // audience: Url::parse("http://localhost:300").unwrap(),
                 audience: "http://localhost:300".to_string(),
                 nonce: None,
                 controller: ProofOfPossessionController {
                     jwk,
                     vm: Some(did_url.clone()),
                 },
+                not_before: Some(ProofOfPossessionNotBefore::AsIssuedAt),
             },
             expires_in,
         )
@@ -442,15 +536,16 @@ mod test {
     }
 
     #[tokio::test]
-    async fn nbf_tolerance() {
+    #[rstest]
+    async fn nbf_tolerance(
+        pop_params: ProofOfPossessionParams,
+        mut pop_verification_params: ProofOfPossessionVerificationParams,
+    ) {
         let expires_in = Duration::minutes(5);
-
-        let (mut pop, did) = generate_pop(expires_in);
+        let mut pop = ProofOfPossession::generate(&pop_params, expires_in);
 
         // Not to be used before now + 5 minutes.
-        let nbf = Some(OffsetDateTime::now_utc() + Duration::minutes(5));
-
-        pop.body.not_before = nbf;
+        pop.body.not_before = Some(OffsetDateTime::now_utc() + Duration::minutes(5));
 
         let pop_jwt = pop.to_jwt().unwrap();
 
@@ -459,33 +554,26 @@ mod test {
             .await
             .unwrap();
 
-        let mut verification_params = ProofOfPossessionVerificationParams {
-            nonce: pop.body.nonce.clone(),
-            audience: pop.body.audience.clone(),
-            issuer: Some("test".to_string()),
-            controller_did: Some(did),
-            controller_jwk: None,
-            nbf_tolerance: None,
-            exp_tolerance: None,
-        };
-
-        pop.verify(&verification_params)
+        pop.verify(&pop_verification_params)
             .await
             .expect_err("should have failed due to nbf");
 
-        verification_params.nbf_tolerance = Some(Duration::minutes(5));
+        pop_verification_params.nbf_tolerance = Some(Duration::minutes(5));
 
-        pop.verify(&verification_params)
+        pop.verify(&pop_verification_params)
             .await
             .expect("should have passed with nbf tolerance");
     }
 
     #[tokio::test]
-    async fn exp_tolerance() {
+    #[rstest]
+    async fn exp_tolerance(
+        pop_params: ProofOfPossessionParams,
+        mut pop_verification_params: ProofOfPossessionVerificationParams,
+    ) {
         // Expires immediately.
-        let expires_in = Duration::minutes(0);
-
-        let (pop, did) = generate_pop(expires_in);
+        let expires_in = Duration::ZERO;
+        let pop = ProofOfPossession::generate(&pop_params, expires_in);
 
         let pop_jwt = pop.to_jwt().unwrap();
 
@@ -494,35 +582,125 @@ mod test {
             .await
             .unwrap();
 
-        let mut verification_params = ProofOfPossessionVerificationParams {
-            nonce: pop.body.nonce.clone(),
-            audience: pop.body.audience.clone(),
-            issuer: Some("test".to_string()),
-            controller_did: Some(did),
-            controller_jwk: None,
-            nbf_tolerance: None,
-            exp_tolerance: None,
-        };
-
-        pop.verify(&verification_params)
+        pop.verify(&pop_verification_params)
             .await
             .expect_err("should have failed due to exp");
 
-        verification_params.exp_tolerance = Some(Duration::minutes(5));
+        pop_verification_params.exp_tolerance = Some(Duration::minutes(5));
 
-        pop.verify(&verification_params)
+        pop.verify(&pop_verification_params)
             .await
             .expect("should have passed with exp tolerance");
     }
 
-    // struct TestSigner {
-    //     jwk: JWK,
-    // }
+    #[tokio::test]
+    #[rstest]
+    #[case(OffsetDateTime::now_utc(), None, None)]
+    #[case(
+        OffsetDateTime::from_unix_timestamp(100).unwrap(),
+        Some(ProofOfPossessionNotBefore::AsIssuedAt),
+        OffsetDateTime::from_unix_timestamp(100).ok())]
+    #[case(
+        OffsetDateTime::from_unix_timestamp(100).unwrap(),
+        Some(ProofOfPossessionNotBefore::Fixed(OffsetDateTime::from_unix_timestamp(200).unwrap())),
+        OffsetDateTime::from_unix_timestamp(200).ok())]
+    #[case(
+        OffsetDateTime::from_unix_timestamp(100).unwrap(),
+        Some(ProofOfPossessionNotBefore::Delay(Duration::seconds(10))),
+        OffsetDateTime::from_unix_timestamp(110).ok())]
+    #[case(
+        OffsetDateTime::from_unix_timestamp(100).unwrap(),
+        Some(ProofOfPossessionNotBefore::Leeway(Duration::seconds(10))),
+        OffsetDateTime::from_unix_timestamp(90).ok())]
+    async fn nbf_generation(
+        mut pop_params: ProofOfPossessionParams,
+        pop_verification_params: ProofOfPossessionVerificationParams,
+        #[case] iat: OffsetDateTime,
+        #[case] not_before: Option<ProofOfPossessionNotBefore>,
+        #[case] not_before_expected: Option<OffsetDateTime>,
+    ) {
+        pop_params.not_before = not_before;
+        let pop = ProofOfPossession::generate_at(&pop_params, iat, Duration::minutes(5));
 
-    // #[async_trait]
-    // impl Signer for TestSigner {
-    //     async fn sign(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
-    //         jws::sign_bytes(self.jwk.get_algorithm().unwrap(), data, &self.jwk)
-    //     }
-    // }
+        assert_eq!(not_before_expected, pop.body.not_before);
+
+        assert_eq!(
+            Err(VerificationError::Expired),
+            pop.verify_at(
+                &pop_verification_params,
+                pop.body.expires_at + Duration::seconds(1)
+            )
+            .await
+        );
+
+        if not_before_expected.is_none() {
+            return;
+        }
+
+        assert_eq!(
+            Ok(()),
+            pop.verify_at(
+                &pop_verification_params,
+                pop.body.not_before.unwrap() + Duration::seconds(1)
+            )
+            .await
+        );
+
+        assert_eq!(
+            Err(VerificationError::NotYetValid),
+            pop.verify_at(
+                &pop_verification_params,
+                pop.body.not_before.unwrap() - Duration::seconds(1)
+            )
+            .await
+        );
+    }
+
+    #[tokio::test]
+    #[rstest]
+    #[case(
+        OffsetDateTime::now_utc(),
+        ProofOfPossessionNotBefore::AsIssuedAt,
+        Duration::minutes(5),
+        Duration::minutes(5)
+    )]
+    #[case(
+        OffsetDateTime::now_utc(),
+        ProofOfPossessionNotBefore::Delay(Duration::minutes(5)),
+        Duration::minutes(5),
+        Duration::minutes(5)
+    )]
+    #[case(
+        OffsetDateTime::now_utc(),
+        ProofOfPossessionNotBefore::Leeway(Duration::minutes(5)),
+        Duration::minutes(5),
+        Duration::minutes(10)
+    )]
+    async fn lifetime(
+        mut pop_params: ProofOfPossessionParams,
+        #[case] iat: OffsetDateTime,
+        #[case] nbf: ProofOfPossessionNotBefore,
+        #[case] expiry: Duration,
+        #[case] total_lifetime: Duration,
+    ) {
+        pop_params.not_before = Some(nbf);
+
+        let pop = ProofOfPossession::generate_at(&pop_params, iat, expiry);
+        assert_eq!(iat, pop.body.issued_at.unwrap());
+
+        let exp = pop.body.expires_at;
+
+        let actual_lifetime = exp - pop.body.not_before.unwrap_or(iat);
+        assert_eq!(total_lifetime, actual_lifetime);
+    }
+
+    #[tokio::test]
+    async fn nbf_deserialize_absent_in_json() {
+        let payload = "eyJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjM1MDAxIiwiaWF0IjoxNzU0NjM3OTQ0LCJleHAiOjE3NTQ2MzgyNDQsIm5vbmNlIjoiVVdUWkRZQXdTbUdYek91ejFFb0pWeW9veUo3UXd1T3JhYVB3YVdLcjBBUSJ9";
+        #[allow(deprecated)]
+        let payload = base64::decode(payload).unwrap();
+        let body: ProofOfPossessionBody = serde_json::from_slice(&payload).unwrap();
+
+        assert_eq!(None, body.not_before);
+    }
 }
