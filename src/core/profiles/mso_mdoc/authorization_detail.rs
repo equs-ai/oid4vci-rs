@@ -1,24 +1,23 @@
-use std::collections::HashMap;
-
 use isomdl::definitions::device_request::DocType;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    core::profiles::AuthorizationDetailsObjectClaim, profiles::AuthorizationDetailsObjectProfile,
+    core::profiles::claims::AuthorizationDetailsObjectClaim,
+    profiles::AuthorizationDetailsObjectProfile,
 };
 
-use super::{Claims, Format};
+use super::Format;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AuthorizationDetailsObjectWithFormat {
     format: Format,
     doctype: DocType,
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    claims: Claims<AuthorizationDetailsObjectClaim>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    claims: Vec<AuthorizationDetailsObjectClaim>,
 }
 
 impl AuthorizationDetailsObjectWithFormat {
-    pub fn new(doctype: DocType, claims: Claims<AuthorizationDetailsObjectClaim>) -> Self {
+    pub fn new(doctype: DocType, claims: Vec<AuthorizationDetailsObjectClaim>) -> Self {
         Self {
             format: Format::MsoMdoc,
             doctype,
@@ -28,7 +27,7 @@ impl AuthorizationDetailsObjectWithFormat {
     field_getters_setters![
         pub self [self] ["ISO mDL authorization detail value"] {
             set_doctype -> doctype[DocType],
-            set_claims -> claims[Claims<AuthorizationDetailsObjectClaim>],
+            set_claims -> claims[Vec<AuthorizationDetailsObjectClaim>],
         }
     ];
 }
@@ -37,17 +36,17 @@ impl AuthorizationDetailsObjectProfile for AuthorizationDetailsObjectWithFormat 
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AuthorizationDetailsObject {
-    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
-    claims: Claims<AuthorizationDetailsObjectClaim>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    claims: Vec<AuthorizationDetailsObjectClaim>,
 }
 
 impl AuthorizationDetailsObject {
-    pub fn new(claims: Claims<AuthorizationDetailsObjectClaim>) -> Self {
+    pub fn new(claims: Vec<AuthorizationDetailsObjectClaim>) -> Self {
         Self { claims }
     }
     field_getters_setters![
         pub self [self] ["ISO mDL authorization detail value"] {
-            set_claims -> claims[ Claims<AuthorizationDetailsObjectClaim>],
+            set_claims -> claims[ Vec<AuthorizationDetailsObjectClaim>],
         }
     ];
 }
@@ -67,19 +66,15 @@ mod test {
     fn roundtrip_with_format() {
         let expected_json = json!(
             {
-                "type":"openid_credential",
-                "format": "mso_mdoc",
-                "doctype": "org.iso.18013.5.1.mDL",
-                "claims": {
-                    "org.iso.18013.5.1": {
-                        "given_name": {},
-                        "family_name": {},
-                        "birth_date": {}
-                    },
-                    "org.iso.18013.5.1.aamva": {
-                        "organ_donor": {}
-                    }
-                }
+              "type": "openid_credential",
+              "format": "mso_mdoc",
+              "doctype": "org.iso.18013.5.1.mDL",
+              "claims": [
+                {"path": ["org.iso.18013.5.1","given_name"]},
+                {"path": ["org.iso.18013.5.1","family_name"]},
+                {"path": ["org.iso.18013.5.1","birth_date"]},
+                {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
+              ]
             }
         );
 
@@ -98,18 +93,14 @@ mod test {
     fn roundtrip() {
         let expected_json = json!(
             {
-                "type":"openid_credential",
-                "credential_configuration_id": "org.iso.18013.5.1.mDL",
-                "claims": {
-                    "org.iso.18013.5.1": {
-                        "given_name": {},
-                        "family_name": {},
-                        "birth_date": {}
-                    },
-                    "org.iso.18013.5.1.aamva": {
-                        "organ_donor": {}
-                    }
-                }
+              "type":"openid_credential",
+              "credential_configuration_id": "org.iso.18013.5.1.mDL",
+              "claims": [
+                {"path": ["org.iso.18013.5.1","given_name"]},
+                {"path": ["org.iso.18013.5.1","family_name"]},
+                {"path": ["org.iso.18013.5.1","birth_date"]},
+                {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
+              ]
             }
         );
 
