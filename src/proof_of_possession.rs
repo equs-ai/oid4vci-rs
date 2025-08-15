@@ -1,4 +1,3 @@
-use std::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
@@ -7,6 +6,7 @@ use ssi_claims::{
 };
 use ssi_dids_core::DIDURLBuf;
 use ssi_jwk::{Algorithm, JWKResolver, JWK};
+use std::ops::{Add, Sub};
 use time::{Duration, OffsetDateTime};
 
 use crate::types::Nonce;

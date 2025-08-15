@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use isomdl::definitions::device_request::{DataElementIdentifier, NameSpace};
 use serde::{Deserialize, Serialize};
 
 pub mod authorization_detail;
@@ -19,5 +16,3 @@ pub enum Format {
     #[serde(rename = "mso_mdoc")]
     MsoMdoc,
 }
-
-pub type Claims<T> = HashMap<NameSpace, HashMap<DataElementIdentifier, T>>;

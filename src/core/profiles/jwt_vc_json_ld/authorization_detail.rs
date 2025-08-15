@@ -1,13 +1,11 @@
-use std::fmt::Debug;
-
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
-use crate::core::profiles::ldp_vc::Format;
 use crate::{
     core::profiles::claims::AuthorizationDetailsObjectClaim,
     profiles::AuthorizationDetailsObjectProfile,
 };
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use super::Format;
 
 #[derive(Clone, Debug, Deserialize, Default, PartialEq, Serialize)]
 pub struct AuthorizationDetailsObjectWithFormat {
@@ -19,7 +17,7 @@ pub struct AuthorizationDetailsObjectWithFormat {
 
 impl AuthorizationDetailsObjectWithFormat {
     field_getters_setters![
-        pub self [self] ["authorization detail value"] {
+        pub self [self] ["JWT VC authorization detail value"] {
             set_credential_definition -> credential_definition[CredentialDefinition],
             set_claims -> claims[Vec<AuthorizationDetailsObjectClaim>],
         }
@@ -30,13 +28,16 @@ impl AuthorizationDetailsObjectProfile for AuthorizationDetailsObjectWithFormat 
 
 #[derive(Clone, Debug, Deserialize, Default, PartialEq, Serialize)]
 pub struct AuthorizationDetailsObject {
-    credential_definition: CredentialDefinitionWithoutContext,
+    credential_definition: CredentialDefinitionWithoutType,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    claims: Vec<AuthorizationDetailsObjectClaim>,
 }
 
 impl AuthorizationDetailsObject {
     field_getters_setters![
-        pub self [self] ["authorization detail value"] {
-            set_credential_definition -> credential_definition[CredentialDefinitionWithoutContext],
+        pub self [self] ["JWT VC authorization detail value"] {
+            set_credential_definition -> credential_definition[CredentialDefinitionWithoutType],
+            set_claims -> claims[Vec<AuthorizationDetailsObjectClaim>],
         }
     ];
 }
@@ -60,9 +61,7 @@ impl CredentialDefinition {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct CredentialDefinitionWithoutContext {}
-
-impl CredentialDefinitionWithoutContext {}
+pub struct CredentialDefinitionWithoutType {}
 
 #[cfg(test)]
 mod test {
@@ -70,30 +69,30 @@ mod test {
 
     use crate::{
         authorization::AuthorizationDetailsObject,
-        core::profiles::{CoreProfilesAuthorizationDetailsObject},
+        core::profiles::CoreProfilesAuthorizationDetailsObject,
     };
 
     #[test]
     fn roundtrip_with_format() {
         let expected_json = json!(
-          {
-            "type": "openid_credential",
-            "format": "ldp_vc",
-            "credential_definition": {
-              "@context": [
-                "https://www.w3.org/2018/credentials/v1",
-                "https://www.w3.org/2018/credentials/examples/v1"
-              ],
-              "type": [
-                "UniversityDegreeCredential"
-              ],
-            },
-            "claims": [
-              {"path": ["credentialSubject", "given_name"]},
-              {"path": ["credentialSubject", "family_name"]},
-              {"path": ["credentialSubject", "degree"]}
-            ]
-          }
+            {
+              "type": "openid_credential",
+              "format": "jwt_vc_json-ld",
+              "credential_definition": {
+                "@context": [
+                  "https://www.w3.org/2018/credentials/v1",
+                  "https://www.w3.org/2018/credentials/examples/v1"
+                ],
+                "type": [
+                  "UniversityDegreeCredential"
+                ],
+              },
+              "claims": [
+                {"path": ["credentialSubject", "given_name"]},
+                {"path": ["credentialSubject", "family_name"]},
+                {"path": ["credentialSubject", "degree"]}
+              ]
+            }
         );
 
         let authorization_detail: AuthorizationDetailsObject<
@@ -110,15 +109,15 @@ mod test {
     #[test]
     fn roundtrip() {
         let expected_json = json!(
-          {
-            "type": "openid_credential",
-            "credential_configuration_id": "UniversityDegree_LDP_VC",
-            "claims": [
-              {"path": ["credentialSubject", "given_name"]},
-              {"path": ["credentialSubject", "family_name"]},
-              {"path": ["credentialSubject", "degree"]}
-            ]
-          }
+            {
+              "type": "openid_credential",
+              "credential_configuration_id": "UniversityDegreeCredential",
+              "claims": [
+                {"path": ["credentialSubject", "given_name"]},
+                {"path": ["credentialSubject", "family_name"]},
+                {"path": ["credentialSubject", "degree"]}
+              ]
+            }
         );
 
         let authorization_detail: AuthorizationDetailsObject<

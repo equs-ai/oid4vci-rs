@@ -4,6 +4,8 @@ pub mod credential_response;
 
 use serde::{Deserialize, Serialize};
 
+pub const FORMAT_IDENTIFIER: &str = "jwt_vc_json-ld";
+
 pub use authorization_detail::{AuthorizationDetailsObject, AuthorizationDetailsObjectWithFormat};
 pub use credential_configuration::CredentialConfiguration;
 pub use credential_response::CredentialResponse;
@@ -11,6 +13,6 @@ pub use credential_response::CredentialResponse;
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub enum Format {
     #[default]
-    #[serde(rename = "dc+sd-jwt")]
-    VcSdJwt,
+    #[serde(rename = "jwt_vc_json-ld")]
+    JwtVcJsonLd,
 }

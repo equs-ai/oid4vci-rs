@@ -1,18 +1,15 @@
+use super::Format;
+use crate::core::profiles::claims::CredentialConfigurationClaim;
+use crate::profiles::CredentialConfigurationProfile;
 use serde::{Deserialize, Serialize};
-
-use crate::{
-    core::profiles::CredentialConfigurationClaim, profiles::CredentialConfigurationProfile,
-};
-
-use super::{Claims, Format};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CredentialConfiguration {
     format: Format,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     credential_signing_alg_values_supported: Vec<ssi_jwk::Algorithm>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    claims: Option<Claims<CredentialConfigurationClaim>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    claims: Vec<CredentialConfigurationClaim>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     order: Vec<String>,
     vct: String,
@@ -31,7 +28,7 @@ impl CredentialConfiguration {
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<ssi_jwk::Algorithm>],
             set_order -> order[Vec<String>],
             set_vct -> vct[String],
-            set_claims -> claims[Option<Claims<CredentialConfigurationClaim>>],
+            set_claims -> claims[Vec<CredentialConfigurationClaim>],
         }
     ];
 }
@@ -61,8 +58,8 @@ mod test {
                 {
                   "name": "IdentityCredential",
                   "logo": {
-                            "uri": "https://university.example.edu/public/logo.png",
-                            "alt_text": "a square logo of a university"
+                    "uri": "https://university.example.edu/public/logo.png",
+                    "alt_text": "a square logo of a university"
                   },
                   "locale": "en-US",
                   "background_color": "#12107c",
@@ -77,8 +74,9 @@ mod test {
                 }
               },
               "vct": "SD_JWT_VC_example_in_OpenID4VCI",
-              "claims": {
-                "given_name": {
+              "claims": [
+                {
+                  "path": ["given_name"],
                   "display": [
                     {
                       "name": "Given Name",
@@ -90,7 +88,8 @@ mod test {
                     }
                   ]
                 },
-                "family_name": {
+                {
+                  "path": ["family_name"],
                   "display": [
                     {
                       "name": "Surname",
@@ -102,19 +101,30 @@ mod test {
                     }
                   ]
                 },
-                "email": {},
-                "phone_number": {},
-                "address": {
-                  "street_address": {},
-                  "locality": {},
-                  "region": {},
-                  "country": {}
+                {"path": ["email"]},
+                {"path": ["phone_number"]},
+                {
+                  "path": ["address"],
+                  "display": [
+                    {
+                      "name": "Place of residence",
+                      "locale": "en-US"
+                    },
+                    {
+                      "name": "Wohnsitz",
+                      "locale": "de-DE"
+                    }
+                  ]
                 },
-                "birthdate": {},
-                "is_over_18": {},
-                "is_over_21": {},
-                "is_over_65": {}
-              }
+                {"path": ["address", "street_address"]},
+                {"path": ["address", "locality"]},
+                {"path": ["address", "region"]},
+                {"path": ["address", "country"]},
+                {"path": ["birthdate"]},
+                {"path": ["is_over_18"]},
+                {"path": ["is_over_21"]},
+                {"path": ["is_over_65"]}
+              ]
             }
         );
         let credential_configuration: CredentialConfiguration<super::CredentialConfiguration> =

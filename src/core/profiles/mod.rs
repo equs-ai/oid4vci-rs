@@ -8,9 +8,10 @@ use crate::{
         AuthorizationDetailsObjectProfile, CredentialConfigurationProfile,
         CredentialResponseProfile, Profile,
     },
-    types::{ClaimValueType, CredentialConfigurationId, LanguageTag},
+    types::CredentialConfigurationId,
 };
 
+pub mod claims;
 pub mod jwt_vc_json;
 pub mod jwt_vc_json_ld;
 pub mod ldp_vc;
@@ -81,8 +82,8 @@ pub enum CoreProfilesAuthorizationDetailsObject {
 #[serde(untagged)]
 pub enum AuthorizationDetailsObjectWithFormat {
     JwtVcJson(jwt_vc_json::AuthorizationDetailsObjectWithFormat),
-    JwtVcJsonLd(jwt_vc_json_ld::AuthorizationDetailWithFormat),
-    LdpVc(ldp_vc::AuthorizationDetailWithFormat),
+    JwtVcJsonLd(jwt_vc_json_ld::AuthorizationDetailsObjectWithFormat),
+    LdpVc(ldp_vc::AuthorizationDetailsObjectWithFormat),
     MsoMdoc(mso_mdoc::AuthorizationDetailsObjectWithFormat),
     VcSdJwt(vc_sd_jwt::AuthorizationDetailsObjectWithFormat),
 }
@@ -124,34 +125,4 @@ pub enum CoreProfilesCredentialResponseType {
 
 impl CredentialResponseProfile for CoreProfilesCredentialResponse {
     type Type = CoreProfilesCredentialResponseType;
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct AuthorizationDetailsObjectClaim {
-    #[serde(default, skip_serializing_if = "is_false")]
-    mandatory: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
-pub struct CredentialConfigurationClaim {
-    #[serde(default, skip_serializing_if = "is_false")]
-    mandatory: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    value_type: Option<ClaimValueType>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    display: Vec<ClaimDisplay>,
-}
-
-fn is_false(b: &bool) -> bool {
-    !b
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ClaimDisplay {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    locale: Option<LanguageTag>,
-    #[serde(flatten)]
-    additional_fields: HashMap<String, Value>,
 }
