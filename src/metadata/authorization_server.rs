@@ -236,7 +236,7 @@ impl AuthorizationServerMetadata {
 }
 
 impl MetadataDiscovery for AuthorizationServerMetadata {
-    const METADATA_URL_SUFFIX: &'static str = ".well-known/openid-configuration";
+    const METADATA_URL_PREFIX: &'static str = "/.well-known/oauth-authorization-server";
 
     fn validate(&self, issuer: &IssuerUrl) -> Result<()> {
         if self.issuer() != issuer {

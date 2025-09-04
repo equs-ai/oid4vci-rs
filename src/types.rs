@@ -324,15 +324,21 @@ new_url_type![
     /// Base URL of the [Credential] Issuer.
     IssuerUrl
     impl {
-        /// Parse a string as a URL, with this URL as the base URL.
+        /// Builds server metadata URL respective to [RFC8414](https://datatracker.ietf.org/doc/html/rfc8414#section-3).
         ///
-        /// See [`Url::parse`].
-        pub fn join(&self, suffix: &str) -> Result<Url, url::ParseError> {
-            if let Some('/') = self.1.chars().next_back() {
-                Url::parse(&(self.1.clone() + suffix))
-            } else {
-                Url::parse(&(self.1.clone() + "/" + suffix))
-            }
+        /// # Examples
+        /// ```rust
+        ///  use oid4vci::types::IssuerUrl;
+        ///
+        /// # fn run() -> Result<(), url::ParseError> {
+        ///  let url = IssuerUrl::new("https://example.com:8443/realms/vci".to_string())?;
+        ///  let prefix = "/.well-known/oauth-authorization-server";
+        ///  assert_eq!("https://example.com:8443/.well-known/oauth-authorization-server/realms/vci", url.metadata(prefix)?.as_str());
+        /// # Ok(())
+        /// # }
+        /// ```
+        pub fn metadata(&self, prefix: &str) -> Result<Url, url::ParseError> {
+            self.url().join(format!("{}{}", prefix, self.url().path()).trim_end_matches('/'))
         }
     }
 ];
@@ -507,3 +513,36 @@ new_secret_type![
     #[derive(Deserialize, Serialize)]
     TxCode(String)
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rstest::*;
+
+    #[rstest]
+    #[case(
+        "https://my-auth-server:8443/realms/test",
+        "/.well-known/oauth-authorization-server",
+        "https://my-auth-server:8443/.well-known/oauth-authorization-server/realms/test"
+    )]
+    #[case::no_suffix(
+        "https://my-auth-server:8443",
+        "/.well-known/oauth-authorization-server",
+        "https://my-auth-server:8443/.well-known/oauth-authorization-server"
+    )]
+    #[case::erase_trailing_slash(
+        "https://my-auth-server:8443",
+        "/.well-known/oauth-authorization-server/",
+        "https://my-auth-server:8443/.well-known/oauth-authorization-server"
+    )]
+    #[case::erase_after_port_slash(
+        "https://my-auth-server:8443/",
+        "/.well-known/oauth-authorization-server",
+        "https://my-auth-server:8443/.well-known/oauth-authorization-server"
+    )]
+    fn server_metadata(#[case] url: &str, #[case] prefix: &str, #[case] expected: &str) {
+        let url = IssuerUrl::new(url.to_string()).unwrap();
+        let actual = url.metadata(prefix).unwrap();
+        assert_eq!(expected, actual.as_str());
+    }
+}

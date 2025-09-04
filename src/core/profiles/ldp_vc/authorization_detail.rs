@@ -70,7 +70,7 @@ mod test {
 
     use crate::{
         authorization::AuthorizationDetailsObject,
-        core::profiles::{CoreProfilesAuthorizationDetailsObject},
+        core::profiles::CoreProfilesAuthorizationDetailsObject,
     };
 
     #[test]

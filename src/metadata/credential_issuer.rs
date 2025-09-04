@@ -42,7 +42,7 @@ impl<CM> MetadataDiscovery for CredentialIssuerMetadata<CM>
 where
     CM: CredentialConfigurationProfile,
 {
-    const METADATA_URL_SUFFIX: &'static str = ".well-known/openid-credential-issuer";
+    const METADATA_URL_PREFIX: &'static str = "/.well-known/openid-credential-issuer";
 
     fn validate(&self, issuer: &IssuerUrl) -> anyhow::Result<()> {
         if self.credential_issuer() != issuer {
