@@ -131,28 +131,11 @@ mod test {
             profiles::{jwt_vc_json, CoreProfilesAuthorizationDetailsObject},
         },
         metadata::AuthorizationServerMetadata,
+        types,
         types::CredentialUrl,
     };
 
     use super::*;
-
-    #[test]
-    fn example_authorization_details() {
-        let _: Vec<AuthorizationDetailsObject<CoreProfilesAuthorizationDetailsObject>> =
-            serde_json::from_value(json!([
-                {
-                  "type": "openid_credential",
-                  "format": "jwt_vc_json",
-                  "credential_definition": {
-                     "type": [
-                        "VerifiableCredential",
-                        "UniversityDegreeCredential"
-                     ]
-                  }
-               }
-            ]))
-            .unwrap();
-    }
 
     #[test]
     fn example_authorization_details_credential_configuration_id() {
@@ -167,20 +150,6 @@ mod test {
     }
 
     #[test]
-    fn example_authorization_details_credential_configuration_id_deny() {
-        assert!(serde_json::from_value::<
-            Vec<AuthorizationDetailsObject<CoreProfilesAuthorizationDetailsObject>>,
-        >(json!([
-            {
-              "type": "openid_credential",
-              "format": "jwt_vc_json",
-              "credential_configuration_id": "UniversityDegreeCredential"
-            }
-        ]))
-        .is_err());
-    }
-
-    #[test]
     fn example_authorization_details_locations() {
         let _: Vec<AuthorizationDetailsObject<CoreProfilesAuthorizationDetailsObject>> =
             serde_json::from_value(json!([
@@ -189,13 +158,7 @@ mod test {
                   "locations": [
                      "https://credential-issuer.example.com"
                   ],
-                  "format": "jwt_vc_json",
-                  "credential_definition": {
-                     "type": [
-                        "VerifiableCredential",
-                        "UniversityDegreeCredential"
-                     ]
-                  }
+                  "credential_configuration_id": "UniversityDegreeCredential",
                }
             ]))
             .unwrap();
@@ -207,7 +170,7 @@ mod test {
             serde_json::from_value(json!([
                 {
                   "type":"openid_credential",
-                  "format": "ldp_vc",
+                  "credential_configuration_id": "UniversityDegreeCredential",
                   "credential_definition": {
                      "@context": [
                         "https://www.w3.org/2018/credentials/v1",
@@ -220,9 +183,9 @@ mod test {
                   }
                },
                {
-                  "type":"openid_credential",
-                  "format": "mso_mdoc",
-                  "doctype":"org.iso.18013.5.1.mDL"
+                  "type": "openid_credential",
+                  "credential_configuration_id": "UniversityDegreeCredential",
+                  "doctype": "org.iso.18013.5.1.mDL"
                }
             ]))
             .unwrap();
@@ -231,7 +194,7 @@ mod test {
     #[test]
     fn example_authorization_redirect() {
         // Modifed the code_challenge from the example and added state and removed spaces in authorization_details
-        let mut expected_url = Url::try_from("https://server.example.com/authorize?response_type=code&client_id=s6BhdRkqt3&code_challenge=MYdqq2Vt_ZLMAWpXXsjGIrlxrCF2e4ZP4SxDf7cm_tg&code_challenge_method=S256&authorization_details=%5B%7B%22type%22%3A%22openid_credential%22%2C%22format%22%3A%22jwt_vc_json%22%2C%22credential_definition%22%3A%7B%22type%22%3A%5B%22VerifiableCredential%22%2C%22UniversityDegreeCredential%22%5D%7D%7D%5D&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb&state=state").unwrap();
+        let mut expected_url = Url::try_from("https://server.example.com/authorize?response_type=code&client_id=s6BhdRkqt3&code_challenge=MYdqq2Vt_ZLMAWpXXsjGIrlxrCF2e4ZP4SxDf7cm_tg&code_challenge_method=S256&authorization_details=%5B%7B%22type%22%3A%22openid_credential%22%2C%22credential_configuration_id%22%3A%22UniversityDegreeCredential%22%7D%5D&redirect_uri=https%3A%2F%2Fclient.example.org%2Fcb&state=state").unwrap();
 
         let issuer = IssuerUrl::new("https://server.example.com".into()).unwrap();
 
@@ -259,20 +222,14 @@ mod test {
             PkceCodeVerifier::new("challengechallengechallengechallengechallenge".into());
         let pkce_challenge = PkceCodeChallenge::from_code_verifier_sha256(&pkce_verifier);
         let state = CsrfToken::new("state".into());
-        let authorization_detail = jwt_vc_json::AuthorizationDetailsObjectWithFormat::default()
-            .set_credential_definition(
-                jwt_vc_json::authorization_detail::CredentialDefinition::default().set_type(vec![
-                    "VerifiableCredential".into(),
-                    "UniversityDegreeCredential".into(),
-                ]),
-            );
+        let authorization_detail = jwt_vc_json::AuthorizationDetailsObject::default();
         let authorization_details = vec![AuthorizationDetailsObject {
             r#type: AuthorizationDetailsObjectType::OpenidCredential,
-            additional_profile_fields: CoreProfilesAuthorizationDetailsObject::WithFormat {
-                inner: crate::core::profiles::AuthorizationDetailsObjectWithFormat::JwtVcJson(
+            additional_profile_fields: CoreProfilesAuthorizationDetailsObject::WithId {
+                credential_configuration_id: types::CredentialConfigurationId::new("UniversityDegreeCredential".to_string()),
+                inner: crate::core::profiles::AuthorizationDetailsObjectWithCredentialConfigurationId::JwtVcJson(
                     authorization_detail,
                 ),
-                _credential_identifier: (),
             },
             locations: vec![],
         }];
