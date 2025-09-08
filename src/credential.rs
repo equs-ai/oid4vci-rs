@@ -251,12 +251,22 @@ where
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorType {
-    InvalidToken,
     InvalidCredentialRequest,
-    UnsupportedCredentialType,
-    UnsupportedCredentialFormat,
+    UnknownCredentialConfiguration,
+    UnknownCredentialIdentifier,
     InvalidProof,
+    InvalidNonce,
     InvalidEncryptionParameters,
+    CredentialRequestDenied,
+    /// Authorization error: invalid_request
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InvalidRequest,
+    /// Authorization error: invalid_token
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InvalidToken,
+    /// Authorization error: insufficient_scope
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InsufficientScope,
 }
 impl ErrorResponseType for ErrorType {}
 pub type Error = StandardErrorResponse<ErrorType>;
