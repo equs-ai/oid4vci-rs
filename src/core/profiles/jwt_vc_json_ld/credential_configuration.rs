@@ -13,8 +13,6 @@ pub struct CredentialConfiguration {
     credential_definition: CredentialDefinition,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     claims: Vec<CredentialConfigurationClaim>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    order: Vec<String>,
 }
 
 impl CredentialConfiguration {
@@ -23,7 +21,6 @@ impl CredentialConfiguration {
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<ssi_jwk::Algorithm>],
             set_credential_definition -> credential_definition[CredentialDefinition],
             set_claims -> claims[Vec<CredentialConfigurationClaim>],
-            set_order -> order[Vec<String>],
         }
     ];
 }

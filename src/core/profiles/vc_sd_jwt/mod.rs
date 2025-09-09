@@ -4,7 +4,7 @@ pub mod credential_response;
 
 use serde::{Deserialize, Serialize};
 
-pub use authorization_detail::{AuthorizationDetailsObject, AuthorizationDetailsObjectWithFormat};
+pub use authorization_detail::AuthorizationDetailsObject;
 pub use credential_configuration::CredentialConfiguration;
 pub use credential_response::CredentialResponse;
 

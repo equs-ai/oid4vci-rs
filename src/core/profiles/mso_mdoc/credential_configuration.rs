@@ -16,8 +16,6 @@ pub struct CredentialConfiguration {
     credential_signing_alg_values_supported: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     claims: Vec<CredentialConfigurationClaim>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    order: Vec<String>,
 }
 
 impl CredentialConfiguration {
@@ -27,15 +25,14 @@ impl CredentialConfiguration {
             doctype,
             credential_signing_alg_values_supported: Vec::new(),
             claims: Default::default(),
-            order: Vec::new(),
         }
     }
+
     field_getters_setters![
         pub self [self] ["ISO mDL metadata value"] {
             set_doctype -> doctype[DocType],
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<String>],
             set_claims -> claims[Vec<CredentialConfigurationClaim>],
-            set_order -> order[Vec<String>],
         }
     ];
 }

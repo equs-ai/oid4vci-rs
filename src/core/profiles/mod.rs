@@ -40,52 +40,17 @@ impl CredentialConfigurationProfile for CoreProfilesCredentialConfiguration {}
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum CoreProfilesAuthorizationDetailsObject {
-    WithFormat {
-        #[serde(flatten)]
-        inner: AuthorizationDetailsObjectWithFormat,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "credential_identifier"
-        )]
-        _credential_identifier: (),
-    },
     WithIdAndUnresolvedProfile {
         credential_configuration_id: CredentialConfigurationId,
         #[serde(flatten)]
         inner: HashMap<String, Value>,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "format"
-        )]
-        _format: (),
     },
     #[serde(skip_deserializing)]
     WithId {
         credential_configuration_id: CredentialConfigurationId,
         #[serde(flatten)]
         inner: AuthorizationDetailsObjectWithCredentialConfigurationId,
-        #[serde(
-            default,
-            skip_serializing,
-            deserialize_with = "crate::deny_field::deny_field",
-            rename = "format"
-        )]
-        _format: (),
     },
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum AuthorizationDetailsObjectWithFormat {
-    JwtVcJson(jwt_vc_json::AuthorizationDetailsObjectWithFormat),
-    JwtVcJsonLd(jwt_vc_json_ld::AuthorizationDetailsObjectWithFormat),
-    LdpVc(ldp_vc::AuthorizationDetailsObjectWithFormat),
-    MsoMdoc(mso_mdoc::AuthorizationDetailsObjectWithFormat),
-    VcSdJwt(vc_sd_jwt::AuthorizationDetailsObjectWithFormat),
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

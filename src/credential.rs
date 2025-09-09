@@ -15,7 +15,6 @@ use crate::{
     credential_response_encryption::CredentialResponseEncryption,
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
     profiles::CredentialResponseProfile,
-    proof_of_possession,
     types::{CredentialConfigurationId, CredentialIdentifier, CredentialUrl},
 };
 
@@ -23,8 +22,8 @@ use crate::{
 pub struct Request {
     #[serde(flatten)]
     pub credential_id: CredentialId,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    proof: Option<Proof>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proofs: Option<Proofs>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_response_encryption: Option<CredentialResponseEncryption>,
 }
@@ -38,26 +37,18 @@ pub enum CredentialId {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum Proof {
-    #[serde(rename = "proof")]
-    One(proof_of_possession::Proof),
-    #[serde(rename = "proofs")]
-    Many(ProofMany),
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum ProofMany {
+pub enum Proofs {
     #[serde(rename = "jwt")]
     Jwt(Vec<String>),
-    #[serde(rename = "ldp_vp")]
-    LdpVp(Vec<serde_json::Value>),
+    #[serde(rename = "di_vp")]
+    DiVp(Vec<serde_json::Value>),
 }
 
-impl ProofMany {
+impl Proofs {
     pub fn len(&self) -> usize {
         match self {
-            ProofMany::Jwt(proofs) => proofs.len(),
-            ProofMany::LdpVp(proofs) => proofs.len(),
+            Proofs::Jwt(proofs) => proofs.len(),
+            Proofs::DiVp(proofs) => proofs.len(),
         }
     }
 }
@@ -66,14 +57,14 @@ impl Request {
     pub(crate) fn new(credential_id: CredentialId) -> Self {
         Self {
             credential_id,
-            proof: None,
+            proofs: None,
             credential_response_encryption: None,
         }
     }
 
     field_getters_setters![
         pub self [self] ["credential request value"] {
-            set_proof -> proof[Option<Proof>],
+            set_proofs -> proofs[Option<Proofs>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption>],
         }
     ];
@@ -96,7 +87,7 @@ impl RequestBuilder {
 
     field_getters_setters![
         pub self [self.body] ["credential request value"] {
-            set_proof -> proof[Option<Proof>],
+            set_proofs -> proofs[Option<Proofs>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption>],
         }
     ];
@@ -251,12 +242,22 @@ where
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ErrorType {
-    InvalidToken,
     InvalidCredentialRequest,
-    UnsupportedCredentialType,
-    UnsupportedCredentialFormat,
+    UnknownCredentialConfiguration,
+    UnknownCredentialIdentifier,
     InvalidProof,
+    InvalidNonce,
     InvalidEncryptionParameters,
+    CredentialRequestDenied,
+    /// Authorization error: invalid_request
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InvalidRequest,
+    /// Authorization error: invalid_token
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InvalidToken,
+    /// Authorization error: insufficient_scope
+    /// [RFC6750](https://www.rfc-editor.org/rfc/rfc6750.html#section-3.1)
+    InsufficientScope,
 }
 impl ErrorResponseType for ErrorType {}
 pub type Error = StandardErrorResponse<ErrorType>;
@@ -268,54 +269,72 @@ pub struct DeferredRequest {
 
 #[cfg(test)]
 mod test {
+    use assert_json_diff::assert_json_eq;
+    use rstest::*;
     use serde_json::json;
 
     use crate::core::profiles::CoreProfilesCredentialResponse;
 
     use super::*;
 
-    #[test]
-    fn example_credential_request_with_credential_identifier() {
-        let _: crate::core::credential::Request = serde_json::from_value(json!({
-            "credential_identifier": "CivilEngineeringDegree-2023",
-            "proof": {
-               "proof_type": "jwt",
-               "jwt": "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8
-               xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJzNkJoZFJrcXQzIiwiYXVkIjoiaHR
-               0cHM6Ly9zZXJ2ZXIuZXhhbXBsZS5jb20iLCJpYXQiOjE1MzY5NTk5NTksIm5vbmNlIjoidFppZ25zbk
-               ZicCJ9.ewdkIkPV50iOeBUqMXCC_aZKPxgihac0aW9EkL1nOzM"
-            }
-        }))
-        .unwrap();
-    }
-
-    #[test]
-    fn example_credential_request_with_credential_configuration_id() {
-        let _: crate::core::credential::Request = serde_json::from_value(json!({
-            "credential_configuration_id": "dc+sd-jwt-1",
-            "proof": {
-               "proof_type": "jwt",
-               "jwt": "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8
-               xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJzNkJoZFJrcXQzIiwiYXVkIjoiaHR
-               0cHM6Ly9zZXJ2ZXIuZXhhbXBsZS5jb20iLCJpYXQiOjE1MzY5NTk5NTksIm5vbmNlIjoidFppZ25zbk
-               ZicCJ9.ewdkIkPV50iOeBUqMXCC_aZKPxgihac0aW9EkL1nOzM"
-            }
-        }))
-        .unwrap();
-    }
-
-    #[test]
-    fn example_credential_request_with_multiple_proofs() {
-        let _: crate::core::credential::Request = serde_json::from_value(json!({
-            "credential_configuration_id": "dc+sd-jwt-1",
-            "proofs": {
-                "jwt": [
-                  "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ",
-                  "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8xIiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ"
-                ]
-            }
-        }))
-        .unwrap();
+    #[rstest]
+    #[case::with_credential_configuration_id(json!({
+      "credential_configuration_id": "org.iso.18013.5.1.mDL",
+      "proofs": {
+        "jwt": [
+          "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8x
+           IiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ"
+        ]
+      }
+    }))]
+    #[case::with_credential_identifier_multiple_proofs(json!({
+      "credential_identifier": "CivilEngineeringDegree-2023",
+      "proofs": {
+        "jwt": [
+          "eyJ0eXAiOiJvcGVuaWQ0dmNpLXByb29mK2p3dCIsImFsZyI6IkVTMjU2IiwiandrIjp7Imt0
+           eSI6IkVDIiwiY3J2IjoiUC0yNTYiLCJ4IjoiblVXQW9BdjNYWml0aDhFN2kxOU9kYXhPTFlG
+           T3dNLVoyRXVNMDJUaXJUNCIsInkiOiJIc2tIVThCalVpMVU5WHFpN1N3bWo4Z3dBS18weGtj
+           RGpFV183MVNvc0VZIn19",
+          "eyJraWQiOiJkaWQ6ZXhhbXBsZTplYmZlYjFmNzEyZWJjNmYxYzI3NmUxMmVjMjEva2V5cy8x
+           IiwiYWxnIjoiRVMyNTYiLCJ0eXAiOiJKV1QifQ"
+        ]
+      }
+    }))]
+    #[case::with_di_vp_proof(json!({
+      "credential_identifier": "CivilEngineeringDegree-2023",
+      "proofs": {
+        "di_vp": [
+          {
+            "@context": [
+              "https://www.w3.org/ns/credentials/v2",
+              "https://www.w3.org/ns/credentials/examples/v2"
+            ],
+            "type": [
+              "VerifiablePresentation"
+            ],
+            "holder": "did:key:z6MkvrFpBNCoYewiaeBLgjUDvLxUtnK5R6mqh5XPvLsrPsro",
+            "proof": [
+              {
+                "type": "DataIntegrityProof",
+                "cryptosuite": "eddsa-2022",
+                "proofPurpose": "authentication",
+                "verificationMethod": "did:key:z6MkvrFpBNCoYewiaeBLgjUDvLxUtnK5R6mq
+                 h5XPvLsrPsro#z6MkvrFpBNCoYewiaeBLgjUDvLxUtnK5R6mqh5XPvLsrPsro",
+                "created": "2023-03-01T14:56:29.280619Z",
+                "challenge": "82d4cb36-11f6-4273-b9c6-df1ac0ff17e9",
+                "domain": "did:web:audience.company.com",
+                "proofValue": "z5hrbHzZiqXHNpLq6i7zePEUcUzEbZKmWfNQzXcUXUrqF7bykQ7A
+                 CiWFyZdT2HcptF1zd1t7NhfQSdqrbPEjZceg7"
+              }
+            ]
+          }
+        ]
+      }
+    }))]
+    fn spec_example_roundtrip(#[case] example: serde_json::Value) {
+        let parsed: Request = serde_json::from_value(example.clone()).unwrap();
+        let serialized = serde_json::to_value(parsed).unwrap();
+        assert_json_eq!(example, serialized);
     }
 
     #[test]
@@ -356,7 +375,7 @@ mod test {
             "error": "invalid_proof",
             "error_description": "Credential Issuer requires key proof to be bound to a Credential Issuer provided nonce.",
         }))
-        .unwrap();
+            .unwrap();
     }
 
     #[test]

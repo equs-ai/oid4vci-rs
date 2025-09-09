@@ -5,7 +5,7 @@ pub mod credential_response;
 use serde::{Deserialize, Serialize};
 
 pub const FORMAT_IDENTIFIER: &str = "ldp_vc";
-pub use authorization_detail::{AuthorizationDetailsObject, AuthorizationDetailsObjectWithFormat};
+pub use authorization_detail::AuthorizationDetailsObject;
 pub use credential_configuration::CredentialConfiguration;
 pub use credential_response::CredentialResponse;
 
