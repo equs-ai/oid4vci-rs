@@ -15,7 +15,6 @@ use crate::{
     credential_response_encryption::CredentialResponseEncryption,
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
     profiles::CredentialResponseProfile,
-    proof_of_possession,
     types::{CredentialConfigurationId, CredentialIdentifier, CredentialUrl},
 };
 
@@ -41,15 +40,15 @@ pub enum CredentialId {
 pub enum Proofs {
     #[serde(rename = "jwt")]
     Jwt(Vec<String>),
-    #[serde(rename = "ldp_vp")]
-    LdpVp(Vec<serde_json::Value>),
+    #[serde(rename = "di_vp")]
+    DiVp(Vec<serde_json::Value>),
 }
 
 impl Proofs {
     pub fn len(&self) -> usize {
         match self {
             Proofs::Jwt(proofs) => proofs.len(),
-            Proofs::LdpVp(proofs) => proofs.len(),
+            Proofs::DiVp(proofs) => proofs.len(),
         }
     }
 }
@@ -301,10 +300,10 @@ mod test {
         ]
       }
     }))]
-    #[case::with_ldp_vp_proof(json!({
+    #[case::with_di_vp_proof(json!({
       "credential_identifier": "CivilEngineeringDegree-2023",
       "proofs": {
-        "ldp_vp": [
+        "di_vp": [
           {
             "@context": [
               "https://www.w3.org/ns/credentials/v2",

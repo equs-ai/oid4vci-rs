@@ -26,8 +26,8 @@ pub struct KeyProofTypesSupported {
 pub enum KeyProofType {
     #[serde(rename = "jwt")]
     Jwt,
-    #[serde(rename = "ldp_vp")]
-    LdpVp,
+    #[serde(rename = "di_vp")]
+    DiVp,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -35,8 +35,8 @@ pub enum KeyProofType {
 pub enum Proof {
     #[serde(rename = "jwt")]
     Jwt { jwt: String },
-    #[serde(rename = "ldp_vp")]
-    LdpVp { ldp_vp: Value },
+    #[serde(rename = "di_vp")]
+    DiVp { di_vp: Value },
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -289,7 +289,7 @@ impl ProofOfPossession {
     ) -> Result<Self, ParsingError> {
         match proof {
             Proof::Jwt { jwt } => Self::from_jwt(jwt, resolver).await,
-            Proof::LdpVp { .. } => todo!(),
+            Proof::DiVp { .. } => todo!(),
         }
     }
 
@@ -299,7 +299,7 @@ impl ProofOfPossession {
                 let body = jwt::decode_unverified(jwt)?;
                 Ok(body)
             }
-            Proof::LdpVp { .. } => todo!(),
+            Proof::DiVp { .. } => todo!(),
         }
     }
 
