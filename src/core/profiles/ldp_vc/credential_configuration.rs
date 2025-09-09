@@ -17,8 +17,6 @@ pub struct CredentialConfiguration {
     credential_signing_alg_values_supported: Vec<String>,
     credential_definition: CredentialDefinition,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    order: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     claims: Vec<CredentialConfigurationClaim>,
 }
 
@@ -27,7 +25,6 @@ impl CredentialConfiguration {
         pub self [self] ["metadata value"] {
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<String>],
             set_credential_definition -> credential_definition[CredentialDefinition],
-            set_order -> order[Vec<String>],
             set_claims -> claims[Vec<CredentialConfigurationClaim>],
         }
     ];
