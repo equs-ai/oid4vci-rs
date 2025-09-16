@@ -94,7 +94,7 @@ mod tests {
     }
 
     #[test]
-    fn clims_path_deserialization() {
+    fn claims_path_deserialization() {
         let expected = ClaimsPath(vec![
             ClaimPathPointer::ElementKey("KEY".to_owned()),
             ClaimPathPointer::AllElements,
