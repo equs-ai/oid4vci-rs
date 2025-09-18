@@ -54,7 +54,7 @@ impl ClaimDisplay {
         pub self [self] ["Claim display"] {
             set_name -> name[Option<String>],
             set_locale -> locale[Option<LanguageTag>],
-        } 
+        }
     ];
 }
 
