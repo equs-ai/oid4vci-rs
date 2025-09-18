@@ -1,9 +1,7 @@
-use crate::{
-    core::profiles::claims::CredentialConfigurationClaim, profiles::CredentialConfigurationProfile,
-};
-use serde::{Deserialize, Serialize};
-
 use super::Format;
+use crate::metadata::credential_issuer::DefaultCredentialMetadata;
+use crate::profiles::CredentialConfigurationProfile;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CredentialConfiguration {
@@ -11,16 +9,15 @@ pub struct CredentialConfiguration {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     credential_signing_alg_values_supported: Vec<ssi_jwk::Algorithm>,
     credential_definition: CredentialDefinition,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    claims: Vec<CredentialConfigurationClaim>,
+    credential_metadata: Option<DefaultCredentialMetadata>,
 }
 
 impl CredentialConfiguration {
     field_getters_setters![
-        pub self [self] ["JWT VC metadata value"] {
+        pub self [self] ["JWT VC credential configuration value"] {
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<ssi_jwk::Algorithm>],
             set_credential_definition -> credential_definition[CredentialDefinition],
-            set_claims -> claims[Vec<CredentialConfigurationClaim>],
+            set_credential_metadata -> credential_metadata[Option<DefaultCredentialMetadata>],
         }
     ];
 }
@@ -50,72 +47,74 @@ mod test {
     fn roundtrip() {
         let expected_json = json!(
             {
-              "$key$": "UniversityDegreeCredential",
-              "format": "jwt_vc_json",
-              "scope": "UniversityDegree",
-              "cryptographic_binding_methods_supported": [
-                "did:example"
-              ],
-              "credential_signing_alg_values_supported": [
-                "ES256"
-              ],
-              "credential_definition": {
-                "type": [
-                  "VerifiableCredential",
-                  "UniversityDegreeCredential"
-                ]
-              },
-              "claims": [
-                {
-                  "path": ["credentialSubject", "given_name"],
-                  "display": [
-                    {
-                      "name": "Given Name",
-                      "locale": "en-US"
-                    }
-                  ]
-                },
-                {
-                  "path": ["credentialSubject", "family_name"],
-                  "display": [
-                    {
-                      "name": "Surname",
-                      "locale": "en-US"
-                    }
-                  ]
-                },
-                {
-                  "path": ["credentialSubject", "degree"]
-                },
-                {
-                  "path": ["credentialSubject", "gpa"],
-                  "mandatory": true,
-                  "display": [
-                    {
-                      "name": "GPA"
-                    }
-                  ]
-                }
-              ],
-              "proof_types_supported": {
-                "jwt": {
-                  "proof_signing_alg_values_supported": [
+                "$key$": "UniversityDegreeCredential",
+                "format": "jwt_vc_json",
+                "scope": "UniversityDegree",
+                "cryptographic_binding_methods_supported": [
+                    "did:example"
+                ],
+                "credential_signing_alg_values_supported": [
                     "ES256"
-                  ]
-                }
-              },
-              "display": [
-                {
-                  "name": "University Credential",
-                  "locale": "en-US",
-                  "logo": {
-                    "uri": "https://university.example.edu/public/logo.png",
-                    "alt_text": "a square logo of a university"
-                  },
-                  "background_color": "#12107c",
-                  "text_color": "#FFFFFF"
-                }
-              ]
+                ],
+                "credential_definition": {
+                    "type": [
+                        "VerifiableCredential",
+                        "UniversityDegreeCredential"
+                    ]
+                },
+                "proof_types_supported": {
+                    "jwt": {
+                        "proof_signing_alg_values_supported": [
+                            "ES256"
+                        ]
+                    }
+                },
+                "credential_metadata": {
+                    "claims": [
+                        {
+                            "path": ["credentialSubject", "given_name"],
+                            "display": [
+                                {
+                                    "name": "Given Name",
+                                    "locale": "en-US"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["credentialSubject", "family_name"],
+                            "display": [
+                                {
+                                    "name": "Surname",
+                                    "locale": "en-US"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["credentialSubject", "degree"]
+                        },
+                        {
+                            "path": ["credentialSubject", "gpa"],
+                            "mandatory": true,
+                            "display": [
+                                {
+                                    "name": "GPA"
+                                }
+                            ]
+                        }
+                    ],
+                    "display": [
+                        {
+                            "name": "University Credential",
+                            "locale": "en-US",
+                            "logo": {
+                                "uri": "https://university.example.edu/public/logo.png",
+                                "alt_text": "a square logo of a university"
+                            },
+                            "background_color": "#12107c",
+                            "text_color": "#FFFFFF"
+                        }
+                    ]
+                },
             }
         );
         let credential_configuration: CredentialConfiguration<super::CredentialConfiguration> =
