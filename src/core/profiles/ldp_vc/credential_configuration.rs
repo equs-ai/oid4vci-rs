@@ -4,9 +4,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::core::profiles::ldp_vc::Format;
-use crate::{
-    core::profiles::claims::CredentialConfigurationClaim, profiles::CredentialConfigurationProfile,
-};
+use crate::metadata::credential_issuer::DefaultCredentialMetadata;
+use crate::profiles::CredentialConfigurationProfile;
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CredentialConfiguration {
@@ -16,8 +15,7 @@ pub struct CredentialConfiguration {
     // https://openid.net/specs/openid-4-verifiable-credential-issuance-1_0-ID1.html#appendix-A.1.2.2-1
     credential_signing_alg_values_supported: Vec<String>,
     credential_definition: CredentialDefinition,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    claims: Vec<CredentialConfigurationClaim>,
+    credential_metadata: Option<DefaultCredentialMetadata>,
 }
 
 impl CredentialConfiguration {
@@ -25,7 +23,7 @@ impl CredentialConfiguration {
         pub self [self] ["metadata value"] {
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<String>],
             set_credential_definition -> credential_definition[CredentialDefinition],
-            set_claims -> claims[Vec<CredentialConfigurationClaim>],
+            set_credential_metadata -> credential_metadata[Option<DefaultCredentialMetadata>],
         }
     ];
 }
@@ -52,9 +50,7 @@ impl CredentialDefinition {
 mod test {
     use serde_json::json;
 
-    use crate::{
-        metadata::credential_issuer::CredentialConfiguration,
-    };
+    use crate::metadata::credential_issuer::CredentialConfiguration;
 
     #[test]
     fn roundtrip() {
@@ -63,65 +59,67 @@ mod test {
                 "$key$": "UniversityDegreeCredential_LDP_VC",
                 "format": "ldp_vc",
                 "cryptographic_binding_methods_supported": [
-                  "did:example"
+                    "did:example"
                 ],
                 "credential_signing_alg_values_supported": [
-                  "Ed25519Signature2018"
+                    "Ed25519Signature2018"
                 ],
                 "credential_definition": {
-                  "@context": [
-                    "https://www.w3.org/2018/credentials/v1",
-                    "https://www.w3.org/2018/credentials/examples/v1"
-                  ],
-                  "type": [
-                    "VerifiableCredential",
-                    "UniversityDegreeCredential"
-                  ]
+                    "@context": [
+                        "https://www.w3.org/2018/credentials/v1",
+                        "https://www.w3.org/2018/credentials/examples/v1"
+                    ],
+                    "type": [
+                        "VerifiableCredential",
+                        "UniversityDegreeCredential"
+                    ]
                 },
-                "claims": [
-                  {
-                    "path": ["credentialSubject", "given_name"],
+                "credential_metadata": {
+                    "claims": [
+                        {
+                            "path": ["credentialSubject", "given_name"],
+                            "display": [
+                                {
+                                    "name": "Given Name",
+                                    "locale": "en-US"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["credentialSubject", "family_name"],
+                            "display": [
+                                {
+                                    "name": "Surname",
+                                    "locale": "en-US"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["credentialSubject", "degree"]
+                        },
+                        {
+                            "path": ["credentialSubject", "gpa"],
+                            "mandatory": true,
+                            "display": [
+                                {
+                                    "name": "GPA"
+                                }
+                            ]
+                        }
+                    ],
                     "display": [
-                      {
-                        "name": "Given Name",
-                        "locale": "en-US"
-                      }
-                    ]
-                  },
-                  {
-                    "path": ["credentialSubject", "family_name"],
-                    "display": [
-                      {
-                        "name": "Surname",
-                        "locale": "en-US"
-                      }
-                    ]
-                  },
-                  {
-                    "path": ["credentialSubject", "degree"]
-                  },
-                  {
-                    "path": ["credentialSubject", "gpa"],
-                    "mandatory": true,
-                    "display": [
-                      {
-                        "name": "GPA"
-                      }
-                    ]
-                  }
-                ],
-                "display": [
-                  {
-                    "name": "University Credential",
-                    "locale": "en-US",
-                    "logo": {
-                      "uri": "https://university.example.edu/public/logo.png",
-                      "alt_text": "a square logo of a university"
-                    },
-                    "background_color": "#12107c",
-                    "text_color": "#FFFFFF"
-                  }
-                ]
+                        {
+                            "name": "University Credential",
+                            "locale": "en-US",
+                            "logo": {
+                                "uri": "https://university.example.edu/public/logo.png",
+                                "alt_text": "a square logo of a university"
+                            },
+                            "background_color": "#12107c",
+                            "text_color": "#FFFFFF"
+                        }
+                    ],
+                }
             }
         );
         let credential_configuration: CredentialConfiguration<super::CredentialConfiguration> =
