@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, skip_serializing_none, KeyValueMap};
 
 use super::MetadataDiscovery;
+use crate::core::profiles::claims::CredentialConfigurationClaim;
 use crate::types::NonceUrl;
 use crate::{
     credential_response_encryption::CredentialResponseEncryptionMetadata,
@@ -30,7 +31,6 @@ where
     notification_endpoint: Option<NotificationUrl>,
     credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
     credential_identifiers_supported: Option<bool>,
-    signed_metadata: Option<String>,
     display: Option<Vec<CredentialIssuerMetadataDisplay>>,
     #[serde(default = "Vec::new", bound = "CM: CredentialConfigurationProfile")]
     #[serde_as(as = "KeyValueMap<_>")]
@@ -70,7 +70,6 @@ where
             notification_endpoint: None,
             credential_response_encryption: None,
             credential_identifiers_supported: None,
-            signed_metadata: None,
             display: None,
             credential_configurations_supported: vec![],
             batch_credential_issuance: None,
@@ -87,7 +86,6 @@ where
             set_notification_endpoint -> notification_endpoint[Option<NotificationUrl>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryptionMetadata>],
             set_credential_identifiers_supported -> credential_identifiers_supported[Option<bool>],
-            set_signed_metadata -> signed_metadata[Option<String>],
             set_display -> display[Option<Vec<CredentialIssuerMetadataDisplay>>],
             set_credential_configurations_supported -> credential_configurations_supported[Vec<CredentialConfiguration<CM>>],
             set_batch_credential_issuance -> batch_credential_issuance[Option<BatchCredentialIssuance>],
@@ -156,7 +154,6 @@ where
     cryptographic_binding_methods_supported: Option<Vec<CryptographicBindingMethod>>,
     #[serde_as(as = "Option<KeyValueMap<_>>")]
     proof_types_supported: Option<Vec<KeyProofTypesSupported>>,
-    display: Option<Vec<CredentialMetadataDisplay>>,
     #[serde(bound = "CM: CredentialConfigurationProfile")]
     #[serde(flatten)]
     profile_specific_fields: CM,
@@ -172,7 +169,6 @@ where
             scope: None,
             cryptographic_binding_methods_supported: None,
             proof_types_supported: None,
-            display: None,
             profile_specific_fields,
         }
     }
@@ -183,7 +179,6 @@ where
             set_scope -> scope[Option<Scope>],
             set_cryptographic_binding_methods_supported -> cryptographic_binding_methods_supported[Option<Vec<CryptographicBindingMethod>>],
             set_proof_types_supported -> proof_types_supported[Option<Vec<KeyProofTypesSupported>>],
-            set_display -> display[Option<Vec<CredentialMetadataDisplay>>],
             set_profile_specific_fields -> profile_specific_fields[CM],
         }
     ];
@@ -206,9 +201,30 @@ pub enum CryptographicBindingMethod {
     Extension(String),
 }
 
+pub type DefaultCredentialMetadata = CredentialMetadata<CredentialMetadataDisplay>;
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct CredentialMetadata<D> {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    claims: Vec<CredentialConfigurationClaim>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    display: Vec<D>,
+}
+
+impl<D> CredentialMetadata<D> {
+    field_getters_setters![
+        pub self [self] ["JWT VC metadata value"] {
+            set_claims -> claims[Vec<CredentialConfigurationClaim>],
+            set_display -> display[Vec<D>],
+        }
+    ];
+}
+
+/// Default fallback credential metadata display.
+/// MAY be overridden by credential profile.
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct CredentialMetadataDisplay {
     name: String,
     locale: Option<LanguageTag>,
@@ -330,9 +346,96 @@ mod test {
                             "UniversityDegreeCredential"
                         ],
                     },
+                    "proof_types_supported": {
+                        "jwt": {
+                            "proof_signing_alg_values_supported": [
+                                "ES256"
+                            ]
+                        }
+                    },
+                    "credential_metadata": {
+                        "claims": [
+                            {
+                                "path": [ "credentialSubject", "given_name"],
+                                "display": [
+                                        {
+                                            "name": "Given Name",
+                                            "locale": "en-US"
+                                        }
+                                ]
+                            },
+                            {
+                                "path": ["credentialSubject", "family_name"],
+                                "display": [
+                                        {
+                                            "name": "Surname",
+                                            "locale": "en-US"
+                                        }
+                                ]
+                            },
+                            {
+                                "path": ["credentialSubject", "degree"]
+                            },
+                            {
+                                "path": ["credentialSubject", "gpa"],
+                                "display": [
+                                    {
+                                        "name": "GPA"
+                                    }
+                                ]
+                            }
+                        ],
+                        "display": [
+                            {
+                                "name": "University Credential",
+                                "locale": "en-US",
+                                "logo": {
+                                    "uri": "https://university.example.edu/public/logo.png",
+                                    "alt_text": "a square logo of a university"
+                                },
+                                "background_color": "#12107c",
+                                "background_image": {
+                                    "uri": "https://university.example.edu/public/background-image.png"
+                                },
+                                "text_color": "#FFFFFF"
+                            }
+                        ]
+                    },
+                }
+            }
+        })).unwrap();
+    }
+
+    #[test]
+    fn example_credential_metadata_jwt() {
+        let _: CredentialConfiguration<CoreProfilesCredentialConfiguration> =
+            serde_json::from_value(json!({
+                "$key$": "name", // purely for test reason, you cannot really deserialize CredentialMetadata on its own
+                "format": "jwt_vc_json",
+                "id": "UniversityDegree_JWT",
+                "cryptographic_binding_methods_supported": [
+                    "did:example"
+                ],
+                "credential_signing_alg_values_supported": [
+                    "ES256K"
+                ],
+                "credential_definition":{
+                    "type": [
+                        "VerifiableCredential",
+                        "UniversityDegreeCredential"
+                    ]
+                },
+                "proof_types_supported": {
+                    "jwt": {
+                        "proof_signing_alg_values_supported": [
+                            "ES256"
+                        ]
+                    }
+                },
+                "credential_metadata": {
                     "claims": [
                         {
-                            "path": [ "credentialSubject", "given_name"],
+                            "path": ["credentialSubject", "given_name"],
                             "display": [
                                     {
                                         "name": "Given Name",
@@ -361,19 +464,12 @@ mod test {
                             ]
                         }
                     ],
-                    "proof_types_supported": {
-                        "jwt": {
-                            "proof_signing_alg_values_supported": [
-                                "ES256"
-                            ]
-                        }
-                    },
                     "display": [
                         {
                             "name": "University Credential",
                             "locale": "en-US",
                             "logo": {
-                                "uri": "https://university.example.edu/public/logo.png",
+                                "uri": "https://exampleuniversity.com/public/logo.png",
                                 "alt_text": "a square logo of a university"
                             },
                             "background_color": "#12107c",
@@ -383,83 +479,7 @@ mod test {
                             "text_color": "#FFFFFF"
                         }
                     ]
-                }
-            }
-        })).unwrap();
-    }
-
-    #[test]
-    fn example_credential_metadata_jwt() {
-        let _: CredentialConfiguration<CoreProfilesCredentialConfiguration> =
-            serde_json::from_value(json!({
-                "$key$": "name", // purely for test reason, you cannot really deserialize CredentialMetadata on its own
-                "format": "jwt_vc_json",
-                "id": "UniversityDegree_JWT",
-                "cryptographic_binding_methods_supported": [
-                    "did:example"
-                ],
-                "credential_signing_alg_values_supported": [
-                    "ES256K"
-                ],
-                "credential_definition":{
-                    "type": [
-                        "VerifiableCredential",
-                        "UniversityDegreeCredential"
-                    ]
                 },
-                "claims": [
-                    {
-                        "path": ["credentialSubject", "given_name"],
-                        "display": [
-                                {
-                                    "name": "Given Name",
-                                    "locale": "en-US"
-                                }
-                        ]
-                    },
-                    {
-                        "path": ["credentialSubject", "family_name"],
-                        "display": [
-                                {
-                                    "name": "Surname",
-                                    "locale": "en-US"
-                                }
-                        ]
-                    },
-                    {
-                        "path": ["credentialSubject", "degree"]
-                    },
-                    {
-                        "path": ["credentialSubject", "gpa"],
-                        "display": [
-                            {
-                                "name": "GPA"
-                            }
-                        ]
-                    }
-                ],
-                "proof_types_supported": {
-                    "jwt": {
-                        "proof_signing_alg_values_supported": [
-                            "ES256"
-                        ]
-                    }
-                },
-                "display": [
-                    {
-                        "name": "University Credential",
-                        "locale": "en-US",
-                        "logo": {
-                            "uri": "https://exampleuniversity.com/public/logo.png",
-                            "alt_text": "a square logo of a university"
-                        },
-                        "background_color": "#12107c",
-                        "background_image": {
-                            "uri": "https://university.example.edu/public/background-image.png"
-                        },
-                        "text_color": "#FFFFFF"
-                    }
-                ]
             }))
             .unwrap();
     }
@@ -494,52 +514,54 @@ mod test {
                         "UniversityDegreeCredential"
                     ],
                 },
-                "claims": [
-                    {
-                        "path": ["credentialSubject", "given_name"],
-                        "display": [
-                                {
-                                    "name": "Given Name",
-                                    "locale": "en-US"
-                                }
-                        ]
-                    },
-                    {
-                        "path": ["credentialSubject", "family_name"],
-                        "display": [
-                                {
-                                    "name": "Surname",
-                                    "locale": "en-US"
-                                }
-                        ]
-                    },
-                    {
-                        "path": ["credentialSubject", "degree"]
-                    },
-                    {
-                        "path": ["credentialSubject", "gpa"],
-                        "display": [
-                            {
-                                "name": "GPA"
-                            }
-                        ]
-                    }
-                ],
-                "display": [
-                    {
-                        "name": "University Credential",
-                        "locale": "en-US",
-                        "logo": {
-                            "uri": "https://exampleuniversity.com/public/logo.png",
-                            "alt_text": "a square logo of a university"
+                "credential_metadata": {
+                    "claims": [
+                        {
+                            "path": ["credentialSubject", "given_name"],
+                            "display": [
+                                    {
+                                        "name": "Given Name",
+                                        "locale": "en-US"
+                                    }
+                            ]
                         },
-                        "background_color": "#12107c",
-                        "background_image": {
-                            "uri": "https://university.example.edu/public/background-image.png"
+                        {
+                            "path": ["credentialSubject", "family_name"],
+                            "display": [
+                                    {
+                                        "name": "Surname",
+                                        "locale": "en-US"
+                                    }
+                            ]
                         },
-                        "text_color": "#FFFFFF"
-                    }
-                ]
+                        {
+                            "path": ["credentialSubject", "degree"]
+                        },
+                        {
+                            "path": ["credentialSubject", "gpa"],
+                            "display": [
+                                {
+                                    "name": "GPA"
+                                }
+                            ]
+                        }
+                    ],
+                    "display": [
+                        {
+                            "name": "University Credential",
+                            "locale": "en-US",
+                            "logo": {
+                                "uri": "https://exampleuniversity.com/public/logo.png",
+                                "alt_text": "a square logo of a university"
+                            },
+                            "background_color": "#12107c",
+                            "background_image": {
+                                "uri": "https://university.example.edu/public/background-image.png"
+                            },
+                            "text_color": "#FFFFFF"
+                        }
+                    ]
+                }
             }))
             .unwrap();
     }
@@ -548,66 +570,68 @@ mod test {
     fn example_credential_metadata_isomdl() {
         let _: CredentialConfiguration<CoreProfilesCredentialConfiguration> =
             serde_json::from_value(json!({
-              "$key$": "name", // purely for test reason, you cannot really deserialize CredentialMetadata on its own
-              "format": "mso_mdoc",
-              "doctype": "org.iso.18013.5.1.mDL",
-              "cryptographic_binding_methods_supported": [
-                "cose_key"
-              ],
-              "credential_signing_alg_values_supported": [
-                "ES256", "ES384", "ES512"
-              ],
-              "display": [
-                {
-                  "name": "Mobile Driving License",
-                  "locale": "en-US",
-                  "logo": {
-                    "uri": "https://state.example.org/public/mdl.png",
-                    "alt_text": "state mobile driving license"
-                  },
-                  "background_color": "#12107c",
-                  "text_color": "#FFFFFF"
-                },
-                {
-                  "name": "モバイル運転免許証",
-                  "locale": "ja-JP",
-                  "logo": {
-                    "uri": "https://state.example.org/public/mdl.png",
-                    "alt_text": "米国州発行のモバイル運転免許証"
-                  },
-                  "background_color": "#12107c",
-                  "text_color": "#FFFFFF"
-                }
-              ],
-              "claims": [
-                {
-                  "path": ["org.iso.18013.5.1","given_name"],
-                  "display": [
+                "$key$": "name", // purely for test reason, you cannot really deserialize CredentialMetadata on its own
+                "format": "mso_mdoc",
+                "doctype": "org.iso.18013.5.1.mDL",
+                "cryptographic_binding_methods_supported": [
+                    "cose_key"
+                ],
+                "credential_signing_alg_values_supported": [
+                    "ES256", "ES384", "ES512"
+                ],
+                "display": [
                     {
-                      "name": "Given Name",
-                      "locale": "en-US"
+                        "name": "Mobile Driving License",
+                        "locale": "en-US",
+                        "logo": {
+                            "uri": "https://state.example.org/public/mdl.png",
+                            "alt_text": "state mobile driving license"
+                        },
+                        "background_color": "#12107c",
+                        "text_color": "#FFFFFF"
                     },
                     {
-                      "name": "名前",
-                      "locale": "ja-JP"
+                        "name": "モバイル運転免許証",
+                        "locale": "ja-JP",
+                        "logo": {
+                            "uri": "https://state.example.org/public/mdl.png",
+                            "alt_text": "米国州発行のモバイル運転免許証"
+                        },
+                        "background_color": "#12107c",
+                        "text_color": "#FFFFFF"
                     }
-                  ]
-                },
-                {
-                  "path": ["org.iso.18013.5.1","family_name"],
-                  "display": [
+                ],
+                "credential_metadata": {
+                    "claims": [
+                     {
+                         "path": ["org.iso.18013.5.1","given_name"],
+                         "display": [
+                             {
+                                 "name": "Given Name",
+                                 "locale": "en-US"
+                             },
+                             {
+                                 "name": "名前",
+                                 "locale": "ja-JP"
+                             }
+                        ]
+                    },
                     {
-                      "name": "Surname",
-                      "locale": "en-US"
-                    }
-                  ]
-                },
-                {
-                  "path": ["org.iso.18013.5.1","birth_date"],
-                  "mandatory": true
-                },
-                {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
-              ]
+                        "path": ["org.iso.18013.5.1","family_name"],
+                        "display": [
+                            {
+                                "name": "Surname",
+                                "locale": "en-US"
+                            }
+                        ]
+                    },
+                    {
+                        "path": ["org.iso.18013.5.1","birth_date"],
+                        "mandatory": true
+                    },
+                    {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
+                  ],
+                }
             }))
             .unwrap();
     }

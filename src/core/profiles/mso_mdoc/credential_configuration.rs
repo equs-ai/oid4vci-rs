@@ -1,11 +1,9 @@
 use isomdl::definitions::device_request::DocType;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    core::profiles::claims::CredentialConfigurationClaim, profiles::CredentialConfigurationProfile,
-};
-
 use super::Format;
+use crate::metadata::credential_issuer::DefaultCredentialMetadata;
+use crate::profiles::CredentialConfigurationProfile;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct CredentialConfiguration {
@@ -14,8 +12,7 @@ pub struct CredentialConfiguration {
     doctype: DocType,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     credential_signing_alg_values_supported: Vec<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    claims: Vec<CredentialConfigurationClaim>,
+    credential_metadata: Option<DefaultCredentialMetadata>,
 }
 
 impl CredentialConfiguration {
@@ -24,7 +21,7 @@ impl CredentialConfiguration {
             format: Format::MsoMdoc,
             doctype,
             credential_signing_alg_values_supported: Vec::new(),
-            claims: Default::default(),
+            credential_metadata: None,
         }
     }
 
@@ -32,7 +29,7 @@ impl CredentialConfiguration {
         pub self [self] ["ISO mDL metadata value"] {
             set_doctype -> doctype[DocType],
             set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<String>],
-            set_claims -> claims[Vec<CredentialConfigurationClaim>],
+            set_credential_metadata -> credential_metadata[Option<DefaultCredentialMetadata>],
         }
     ];
 }
@@ -46,68 +43,70 @@ mod test {
     #[test]
     fn roundtrip() {
         let expected_json = serde_json::json!(
-          {
-            "$key$": "org.iso.18013.5.1.mDL",
-            "format": "mso_mdoc",
-            "doctype": "org.iso.18013.5.1.mDL",
-            "cryptographic_binding_methods_supported": [
-              "cose_key"
-            ],
-            "credential_signing_alg_values_supported": [
-              "ES256", "ES384", "ES512"
-            ],
-            "display": [
-              {
-                "name": "Mobile Driving License",
-                "locale": "en-US",
-                "logo": {
-                  "uri": "https://state.example.org/public/mdl.png",
-                  "alt_text": "state mobile driving license"
-                },
-                "background_color": "#12107c",
-                "text_color": "#FFFFFF"
-              },
-              {
-                "name": "モバイル運転免許証",
-                "locale": "ja-JP",
-                "logo": {
-                  "uri": "https://state.example.org/public/mdl.png",
-                  "alt_text": "米国州発行のモバイル運転免許証"
-                },
-                "background_color": "#12107c",
-                "text_color": "#FFFFFF"
-              }
-            ],
-            "claims": [
-              {
-                "path": ["org.iso.18013.5.1","given_name"],
-                "display": [
-                  {
-                    "name": "Given Name",
-                    "locale": "en-US"
-                  },
-                  {
-                    "name": "名前",
-                    "locale": "ja-JP"
-                  }
-                ]
-              },
-              {
-                "path": ["org.iso.18013.5.1","family_name"],
-                "display": [
-                  {
-                    "name": "Surname",
-                    "locale": "en-US"
-                  }
-                ]
-              },
-              {
-                "path": ["org.iso.18013.5.1","birth_date"],
-                "mandatory": true
-              },
-              {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
-            ]
-          }
+            {
+                "$key$": "org.iso.18013.5.1.mDL",
+                "format": "mso_mdoc",
+                "doctype": "org.iso.18013.5.1.mDL",
+                "cryptographic_binding_methods_supported": [
+                    "cose_key"
+                ],
+                "credential_signing_alg_values_supported": [
+                    "ES256", "ES384", "ES512"
+                ],
+                "credential_metadata": {
+                    "display": [
+                        {
+                            "name": "Mobile Driving License",
+                            "locale": "en-US",
+                            "logo": {
+                                "uri": "https://state.example.org/public/mdl.png",
+                                "alt_text": "state mobile driving license"
+                            },
+                            "background_color": "#12107c",
+                            "text_color": "#FFFFFF"
+                        },
+                        {
+                            "name": "モバイル運転免許証",
+                            "locale": "ja-JP",
+                            "logo": {
+                                "uri": "https://state.example.org/public/mdl.png",
+                                "alt_text": "米国州発行のモバイル運転免許証"
+                            },
+                            "background_color": "#12107c",
+                            "text_color": "#FFFFFF"
+                        }
+                    ],
+                    "claims": [
+                        {
+                            "path": ["org.iso.18013.5.1","given_name"],
+                            "display": [
+                                {
+                                    "name": "Given Name",
+                                    "locale": "en-US"
+                                },
+                                {
+                                    "name": "名前",
+                                    "locale": "ja-JP"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["org.iso.18013.5.1","family_name"],
+                            "display": [
+                                {
+                                    "name": "Surname",
+                                    "locale": "en-US"
+                                }
+                            ]
+                        },
+                        {
+                            "path": ["org.iso.18013.5.1","birth_date"],
+                            "mandatory": true
+                        },
+                        {"path": ["org.iso.18013.5.1.aamva","organ_donor"]}
+                    ]
+                }
+            }
         );
         let credential_configuration: CredentialConfiguration<super::CredentialConfiguration> =
             serde_path_to_error::deserialize(&mut serde_json::Deserializer::from_str(
