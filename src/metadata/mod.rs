@@ -60,13 +60,13 @@ pub trait MetadataDiscovery: DeserializeOwned + Serialize {
     }
 }
 
-fn discovery_url<M: MetadataDiscovery>(issuer: &IssuerUrl) -> Result<Url> {
+pub fn discovery_url<M: MetadataDiscovery>(issuer: &IssuerUrl) -> Result<Url> {
     issuer
         .join(M::METADATA_URL_SUFFIX)
         .context("failed to construct metadata URL")
 }
 
-fn discovery_request(discovery_url: &Url) -> Result<HttpRequest> {
+pub fn discovery_request(discovery_url: &Url) -> Result<HttpRequest> {
     http::Request::builder()
         .uri(discovery_url.to_string())
         .method(Method::GET)
@@ -75,7 +75,7 @@ fn discovery_request(discovery_url: &Url) -> Result<HttpRequest> {
         .context("failed to prepare request")
 }
 
-fn discovery_response<M: MetadataDiscovery>(
+pub fn discovery_response<M: MetadataDiscovery>(
     issuer: &IssuerUrl,
     discovery_url: &Url,
     discovery_response: HttpResponse,
