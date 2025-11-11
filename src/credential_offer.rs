@@ -129,38 +129,37 @@ impl CredentialOffer {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CredentialOfferParameters {
-    pub credential_issuer: IssuerUrl,
-    pub credential_configuration_ids: Vec<CredentialConfigurationId>,
+    credential_issuer: IssuerUrl,
+    credential_configuration_ids: Vec<CredentialConfigurationId>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub grants: Option<CredentialOfferGrants>,
+    grants: Option<CredentialOfferGrants>,
     #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
-    pub additional_fields: HashMap<String, Value>,
+    additional_fields: HashMap<String, Value>,
 }
 
 impl CredentialOfferParameters {
-    pub fn issuer(&self) -> &IssuerUrl {
-        &self.credential_issuer
+    pub fn new(
+        credential_issuer: IssuerUrl,
+        credential_configuration_ids: Vec<CredentialConfigurationId>,
+        grants: Option<CredentialOfferGrants>,
+        additional_fields: HashMap<String, Value>
+    ) -> Self {
+        Self {
+            credential_issuer,
+            credential_configuration_ids,
+            grants,
+            additional_fields,
+        }
     }
 
-    pub fn grants(&self) -> Option<&CredentialOfferGrants> {
-        self.grants.as_ref()
-    }
-
-    pub fn credential_configuration_ids(&self) -> &[CredentialConfigurationId] {
-        &self.credential_configuration_ids
-    }
-
-    pub fn authorization_code_grant(&self) -> Option<&AuthorizationCodeGrant> {
-        self.grants()?.authorization_code()
-    }
-
-    pub fn pre_authorized_code_grant(&self) -> Option<&PreAuthorizedCodeGrant> {
-        self.grants()?.pre_authorized_code()
-    }
-
-    pub fn additional_field(&self, key: &str) -> Option<&Value> {
-        self.additional_fields.get(key)
-    }
+    field_getters_setters![
+        pub self [self] ["credential offer grants"] {
+            set_credential_issuer -> credential_issuer[IssuerUrl],
+            set_credential_configuration_ids -> credential_configuration_ids[Vec<CredentialConfigurationId>],
+            set_grants -> grants[Option<CredentialOfferGrants>],
+            set_additional_fields -> additional_fields[HashMap<String, Value>],
+        }
+    ];
 }
 
 #[serde_as]
@@ -182,6 +181,7 @@ impl CredentialOfferGrants {
             pre_authorized_code,
         }
     }
+
     field_getters_setters![
         pub self [self] ["credential offer grants"] {
             set_authorization_code -> authorization_code[Option<AuthorizationCodeGrant>],
@@ -340,11 +340,6 @@ mod test {
         let credential_offer: CredentialOfferParameters =
             serde_json::from_value(original.clone()).unwrap();
         let credential_offer_json_actual = serde_json::to_value(credential_offer).unwrap();
-        println!(
-            "Expected: {}\nActual: {}",
-            serde_json::to_string_pretty(&original).unwrap(),
-            serde_json::to_string_pretty(&credential_offer_json_actual).unwrap()
-        );
         assert_json_eq!(original, credential_offer_json_actual);
     }
 }
