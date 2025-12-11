@@ -52,7 +52,7 @@ mod test {
         .unwrap();
 
         let credential_issuer_metadata =
-            CredentialIssuerMetadata::discover_async(credential_offer.issuer(), &http_client)
+            CredentialIssuerMetadata::discover_async(credential_offer.credential_issuer(), &http_client)
                 .await
                 .unwrap();
 
@@ -71,7 +71,7 @@ mod test {
 
         assert_eq!(targeted_credentials.len(), 1);
 
-        let grant = credential_offer.pre_authorized_code_grant().unwrap();
+        let grant = credential_offer.grants().unwrap().pre_authorized_code().unwrap();
         let authorization_server = grant.authorization_server();
 
         let authorization_server_metadata =
@@ -94,7 +94,9 @@ mod test {
         let token_response = client
             .exchange_pre_authorized_code(
                 credential_offer
-                    .pre_authorized_code_grant()
+                    .grants()
+                    .unwrap()
+                    .pre_authorized_code()
                     .unwrap()
                     .pre_authorized_code()
                     .clone(),

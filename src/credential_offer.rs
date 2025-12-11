@@ -6,7 +6,9 @@ use oauth2::{
     AsyncHttpClient, SyncHttpClient,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use serde_with::{serde_as, skip_serializing_none};
+use std::collections::HashMap;
 use url::Url;
 
 use crate::{
@@ -127,31 +129,37 @@ impl CredentialOffer {
 #[skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CredentialOfferParameters {
-    pub credential_issuer: IssuerUrl,
-    pub credential_configuration_ids: Vec<CredentialConfigurationId>,
-    pub grants: Option<CredentialOfferGrants>,
+    credential_issuer: IssuerUrl,
+    credential_configuration_ids: Vec<CredentialConfigurationId>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    grants: Option<CredentialOfferGrants>,
+    #[serde(flatten, skip_serializing_if = "HashMap::is_empty")]
+    additional_fields: HashMap<String, Value>,
 }
 
 impl CredentialOfferParameters {
-    pub fn issuer(&self) -> &IssuerUrl {
-        &self.credential_issuer
+    pub fn new(
+        credential_issuer: IssuerUrl,
+        credential_configuration_ids: Vec<CredentialConfigurationId>,
+        grants: Option<CredentialOfferGrants>,
+        additional_fields: HashMap<String, Value>
+    ) -> Self {
+        Self {
+            credential_issuer,
+            credential_configuration_ids,
+            grants,
+            additional_fields,
+        }
     }
 
-    pub fn grants(&self) -> Option<&CredentialOfferGrants> {
-        self.grants.as_ref()
-    }
-
-    pub fn credential_configuration_ids(&self) -> &[CredentialConfigurationId] {
-        &self.credential_configuration_ids
-    }
-
-    pub fn authorization_code_grant(&self) -> Option<&AuthorizationCodeGrant> {
-        self.grants()?.authorization_code()
-    }
-
-    pub fn pre_authorized_code_grant(&self) -> Option<&PreAuthorizedCodeGrant> {
-        self.grants()?.pre_authorized_code()
-    }
+    field_getters_setters![
+        pub self [self] ["credential offer grants"] {
+            set_credential_issuer -> credential_issuer[IssuerUrl],
+            set_credential_configuration_ids -> credential_configuration_ids[Vec<CredentialConfigurationId>],
+            set_grants -> grants[Option<CredentialOfferGrants>],
+            set_additional_fields -> additional_fields[HashMap<String, Value>],
+        }
+    ];
 }
 
 #[serde_as]
@@ -173,6 +181,7 @@ impl CredentialOfferGrants {
             pre_authorized_code,
         }
     }
+
     field_getters_setters![
         pub self [self] ["credential offer grants"] {
             set_authorization_code -> authorization_code[Option<AuthorizationCodeGrant>],
@@ -183,7 +192,9 @@ impl CredentialOfferGrants {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuthorizationCodeGrant {
+    #[serde(skip_serializing_if = "Option::is_none")]
     issuer_state: Option<IssuerState>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     authorization_server: Option<IssuerUrl>,
 }
 
@@ -206,8 +217,11 @@ impl AuthorizationCodeGrant {
 pub struct PreAuthorizedCodeGrant {
     #[serde(rename = "pre-authorized_code")]
     pre_authorized_code: PreAuthorizedCode,
+    #[serde(skip_serializing_if = "Option::is_none")]
     tx_code: Option<TxCodeDefinition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     interval: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     authorization_server: Option<IssuerUrl>,
 }
 
@@ -283,13 +297,14 @@ pub struct TransactionCode {
 
 #[cfg(test)]
 mod test {
-    use serde_json::json;
+    use assert_json_diff::assert_json_eq;
+    use rstest::*;
 
     use super::*;
 
-    #[test]
-    fn example_credential_offer_object() {
-        let _: CredentialOfferParameters = serde_json::from_value(json!({
+    #[rstest]
+    #[tokio::test]
+    #[case::example(serde_json::json!({
            "credential_issuer": "https://credential-issuer.example.com",
            "credential_configuration_ids": [
               "UniversityDegreeCredential",
@@ -300,7 +315,7 @@ mod test {
                  "issuer_state": "eyJhbGciOiJSU0Et...FYUaBy"
               },
               "urn:ietf:params:oauth:grant-type:pre-authorized_code": {
-                 "pre-authorized_code": "adhjhdjajkdkhjhdj",
+                 "pre-authorized_code": "oaKazRN8I0IbtZ0C7JuMn5",
                  "tx_code": {
                    "length": 4,
                    "input_mode": "numeric",
@@ -308,7 +323,23 @@ mod test {
                  }
               }
            }
-        }))
-        .unwrap();
+        })
+    )]
+    #[case::additional_parameters(serde_json::json!({
+            "credential_issuer": "https://credential-issuer.example.com",
+            "credential_configuration_ids": [],
+            "additional_key": "additional_value",
+            "additional_key_list": ["additional_value_2", true],
+            "additional_key_object": {
+                "inner_key": "inner_value",
+                "inner_key_num": 12345
+            },
+        })
+    )]
+    async fn credential_offer_roundtrip(#[case] original: Value) {
+        let credential_offer: CredentialOfferParameters =
+            serde_json::from_value(original.clone()).unwrap();
+        let credential_offer_json_actual = serde_json::to_value(credential_offer).unwrap();
+        assert_json_eq!(original, credential_offer_json_actual);
     }
 }
