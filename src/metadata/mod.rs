@@ -22,7 +22,7 @@ pub use authorization_server::AuthorizationServerMetadata;
 pub use credential_issuer::CredentialIssuerMetadata;
 
 pub trait MetadataDiscovery: DeserializeOwned + Serialize {
-    const METADATA_URL_SUFFIX: &'static str;
+    const METADATA_URL_PREFIX: &'static str;
 
     fn validate(&self, issuer: &IssuerUrl) -> Result<()>;
 
@@ -62,7 +62,7 @@ pub trait MetadataDiscovery: DeserializeOwned + Serialize {
 
 pub fn discovery_url<M: MetadataDiscovery>(issuer: &IssuerUrl) -> Result<Url> {
     issuer
-        .join(M::METADATA_URL_SUFFIX)
+        .metadata(M::METADATA_URL_PREFIX)
         .context("failed to construct metadata URL")
 }
 
