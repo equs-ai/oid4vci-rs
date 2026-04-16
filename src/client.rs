@@ -7,6 +7,7 @@ use oauth2::{
     TokenUrl,
 };
 
+use crate::credential::{DeferredRequest, Request};
 use crate::types::NonceUrl;
 use crate::{
     authorization::AuthorizationRequest,
@@ -34,6 +35,8 @@ pub enum Error {
     AuthUnsupported(ConfigurationError),
     #[error("An error occurred when discovering metadata: {0}")]
     MetadataDiscovery(anyhow::Error),
+    #[error("Deferred credential issuance is not supported by this issuer")]
+    DeferredIssuanceUnsupported,
 }
 
 pub struct Client<C>
@@ -172,9 +175,23 @@ where
         &self,
         access_token: AccessToken,
         credential_id: credential::CredentialId,
-    ) -> credential::RequestBuilder {
-        let body = credential::Request::new(credential_id);
-        credential::RequestBuilder::new(body, self.credential_endpoint().clone(), access_token)
+    ) -> credential::RequestBuilder<Request> {
+        let body = Request::new(credential_id);
+        credential::RequestBuilder::new(body, self.credential_endpoint().to_string(), access_token)
+    }
+
+    pub fn request_deferred_credential(
+        &self,
+        access_token: AccessToken,
+        transaction_id: String,
+    ) -> Result<credential::RequestBuilder<DeferredRequest>, Error> {
+        let request = DeferredRequest::new(transaction_id);
+        self.deferred_credential_endpoint
+            .as_ref()
+            .map(|endpoint| {
+                credential::RequestBuilder::new(request, endpoint.to_string(), access_token)
+            })
+            .ok_or(Error::DeferredIssuanceUnsupported)
     }
 
     pub fn request_nonce(&self) -> Option<nonce::Request> {
