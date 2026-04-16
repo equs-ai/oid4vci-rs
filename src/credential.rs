@@ -231,11 +231,10 @@ where
     CR: CredentialResponseProfile,
 {
     #[serde(bound = "CR: CredentialResponseProfile")]
-    Immediate {
-        credentials: Vec<CR::Type>,
-    },
+    Immediate { credentials: Vec<CR::Type> },
     Deferred {
-        transaction_id: Option<String>,
+        transaction_id: String,
+        interval: u32,
     },
 }
 
@@ -357,13 +356,21 @@ mod test {
 
     #[test]
     fn example_credential_deferred_response_object() {
+        let tx_id = "8xLOxBtZp8";
+        let interval = 300;
         let resp: Response<CoreProfilesCredentialResponse> = serde_json::from_value(json!({
-            "transaction_id": "8xLOxBtZp8",
+            "transaction_id": tx_id,
+            "interval": interval,
         }))
         .unwrap();
 
-        if let ResponseEnum::Deferred { transaction_id } = resp.response_kind {
-            assert_eq!(transaction_id.unwrap().as_str(), "8xLOxBtZp8");
+        if let ResponseEnum::Deferred {
+            transaction_id,
+            interval,
+        } = resp.response_kind
+        {
+            assert_eq!(transaction_id.as_str(), tx_id);
+            assert_eq!(interval, 300);
         } else {
             panic!("Unexpected response type");
         }
