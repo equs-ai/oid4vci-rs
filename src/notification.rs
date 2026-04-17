@@ -44,6 +44,14 @@ impl NotificationRequest {
             event_description,
         }
     }
+
+    field_getters_setters![
+        pub self [self] ["notification request value"] {
+            set_notification_id -> notification_id[String],
+            set_event -> event[NotificationRequestEvent],
+            set_event_description -> event_description[Option<String>],
+        }
+    ];
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
