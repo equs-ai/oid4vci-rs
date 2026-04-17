@@ -8,7 +8,8 @@ use oauth2::{
 };
 
 use crate::credential::{DeferredRequest, Request};
-use crate::types::NonceUrl;
+use crate::notification::{NotificationRequest, NotificationRequestBuilder};
+use crate::types::{NonceUrl, NotificationUrl};
 use crate::{
     authorization::AuthorizationRequest,
     credential,
@@ -17,7 +18,7 @@ use crate::{
         credential_issuer::{CredentialConfiguration, CredentialIssuerMetadataDisplay},
         AuthorizationServerMetadata, CredentialIssuerMetadata,
     },
-    nonce,
+    nonce, notification,
     pre_authorized_code::PreAuthorizedCodeTokenRequest,
     profiles::Profile,
     pushed_authorization::PushedAuthorizationRequest,
@@ -37,6 +38,8 @@ pub enum Error {
     MetadataDiscovery(anyhow::Error),
     #[error("Deferred credential issuance is not supported by this issuer")]
     DeferredIssuanceUnsupported,
+    #[error("Notification are not supported by this issuer")]
+    NotificationsUnsupported,
 }
 
 pub struct Client<C>
@@ -60,6 +63,7 @@ where
     nonce_endpoint: Option<NonceUrl>,
     par_auth_url: Option<ParUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
+    notification_endpoint: Option<NotificationUrl>,
     credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
     credential_configurations_supported: Vec<CredentialConfiguration<C::CredentialConfiguration>>,
     display: Option<Vec<CredentialIssuerMetadataDisplay>>,
@@ -104,6 +108,7 @@ where
             deferred_credential_endpoint: credential_issuer_metadata
                 .deferred_credential_endpoint()
                 .cloned(),
+            notification_endpoint: credential_issuer_metadata.notification_endpoint().cloned(),
             credential_response_encryption: credential_issuer_metadata
                 .credential_response_encryption()
                 .cloned(),
@@ -200,6 +205,19 @@ where
         }
 
         None
+    }
+
+    pub fn send_notification(
+        &self,
+        access_token: AccessToken,
+        notification: NotificationRequest,
+    ) -> Result<NotificationRequestBuilder, Error> {
+        self.notification_endpoint
+            .as_ref()
+            .map(|endpoint| {
+                NotificationRequestBuilder::new(notification, endpoint.to_owned(), access_token)
+            })
+            .ok_or(Error::NotificationsUnsupported)
     }
 
     fn new_inner_client(
