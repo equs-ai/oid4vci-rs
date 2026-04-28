@@ -152,9 +152,7 @@ impl<B: Serialize> RequestBuilder<B> {
         RE: std::error::Error + 'static,
         CR: CredentialResponseProfile,
     {
-        if http_response.status() != StatusCode::OK
-            && http_response.status() != StatusCode::ACCEPTED
-        {
+        if [StatusCode::OK, StatusCode::ACCEPTED].contains(&http_response.status()) {
             return Err(RequestError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),
