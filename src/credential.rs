@@ -1,5 +1,5 @@
 use std::future::Future;
-
+use std::ops::Not;
 use oauth2::{
     http::{
         self,
@@ -152,7 +152,7 @@ impl<B: Serialize> RequestBuilder<B> {
         RE: std::error::Error + 'static,
         CR: CredentialResponseProfile,
     {
-        if [StatusCode::OK, StatusCode::ACCEPTED].contains(&http_response.status()) {
+        if [StatusCode::OK, StatusCode::ACCEPTED].contains(&http_response.status()).not() {
             return Err(RequestError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),
@@ -236,7 +236,7 @@ where
     Immediate { credentials: Vec<CR::Type> },
     Deferred {
         transaction_id: String,
-        interval: u32,
+        interval: u32, // seconds
     },
 }
 
