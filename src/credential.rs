@@ -1,5 +1,5 @@
 use std::future::Future;
-
+use std::ops::Not;
 use oauth2::{
     http::{
         self,
@@ -11,6 +11,7 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::credential_response_encryption::DeferredCredentialUrl;
 use crate::{
     credential_response_encryption::CredentialResponseEncryption,
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
@@ -69,28 +70,30 @@ impl Request {
         }
     ];
 }
-
-pub struct RequestBuilder {
-    body: Request,
-    url: CredentialUrl,
-    access_token: AccessToken,
-}
-
-impl RequestBuilder {
-    pub(crate) fn new(body: Request, url: CredentialUrl, access_token: AccessToken) -> Self {
-        Self {
-            body,
-            url,
-            access_token,
-        }
-    }
-
+impl RequestBuilder<Request> {
     field_getters_setters![
         pub self [self.body] ["credential request value"] {
             set_proofs -> proofs[Option<Proofs>],
             set_credential_response_encryption -> credential_response_encryption[Option<CredentialResponseEncryption>],
         }
     ];
+}
+impl RequestBuilder<DeferredRequest> {}
+
+pub struct RequestBuilder<B: Serialize> {
+    body: B,
+    url: String,
+    access_token: AccessToken,
+}
+
+impl<B: Serialize> RequestBuilder<B> {
+    pub(crate) fn new(body: B, url: String, access_token: AccessToken) -> Self {
+        Self {
+            body,
+            url,
+            access_token,
+        }
+    }
 
     pub fn request<C, CR>(
         self,
@@ -149,8 +152,7 @@ impl RequestBuilder {
         RE: std::error::Error + 'static,
         CR: CredentialResponseProfile,
     {
-        // TODO status 202 if deferred
-        if http_response.status() != StatusCode::OK {
+        if [StatusCode::OK, StatusCode::ACCEPTED].contains(&http_response.status()).not() {
             return Err(RequestError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),
@@ -231,11 +233,10 @@ where
     CR: CredentialResponseProfile,
 {
     #[serde(bound = "CR: CredentialResponseProfile")]
-    Immediate {
-        credentials: Vec<CR::Type>,
-    },
+    Immediate { credentials: Vec<CR::Type> },
     Deferred {
-        transaction_id: Option<String>,
+        transaction_id: String,
+        interval: u32, // seconds
     },
 }
 
@@ -265,6 +266,12 @@ pub type Error = StandardErrorResponse<ErrorType>;
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DeferredRequest {
     transaction_id: String,
+}
+
+impl DeferredRequest {
+    pub(crate) fn new(transaction_id: String) -> Self {
+        Self { transaction_id }
+    }
 }
 
 #[cfg(test)]
@@ -357,13 +364,21 @@ mod test {
 
     #[test]
     fn example_credential_deferred_response_object() {
+        let tx_id = "8xLOxBtZp8";
+        let interval = 300;
         let resp: Response<CoreProfilesCredentialResponse> = serde_json::from_value(json!({
-            "transaction_id": "8xLOxBtZp8",
+            "transaction_id": tx_id,
+            "interval": interval,
         }))
         .unwrap();
 
-        if let ResponseEnum::Deferred { transaction_id } = resp.response_kind {
-            assert_eq!(transaction_id.unwrap().as_str(), "8xLOxBtZp8");
+        if let ResponseEnum::Deferred {
+            transaction_id,
+            interval,
+        } = resp.response_kind
+        {
+            assert_eq!(transaction_id.as_str(), tx_id);
+            assert_eq!(interval, 300);
         } else {
             panic!("Unexpected response type");
         }

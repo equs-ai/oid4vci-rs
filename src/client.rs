@@ -7,7 +7,9 @@ use oauth2::{
     TokenUrl,
 };
 
-use crate::types::NonceUrl;
+use crate::credential::{DeferredRequest, Request};
+use crate::notification::{NotificationRequest, NotificationRequestBuilder};
+use crate::types::{NonceUrl, NotificationUrl};
 use crate::{
     authorization::AuthorizationRequest,
     credential,
@@ -16,7 +18,7 @@ use crate::{
         credential_issuer::{CredentialConfiguration, CredentialIssuerMetadataDisplay},
         AuthorizationServerMetadata, CredentialIssuerMetadata,
     },
-    nonce,
+    nonce, notification,
     pre_authorized_code::PreAuthorizedCodeTokenRequest,
     profiles::Profile,
     pushed_authorization::PushedAuthorizationRequest,
@@ -34,6 +36,10 @@ pub enum Error {
     AuthUnsupported(ConfigurationError),
     #[error("An error occurred when discovering metadata: {0}")]
     MetadataDiscovery(anyhow::Error),
+    #[error("Deferred credential issuance is not supported by this issuer")]
+    DeferredIssuanceUnsupported,
+    #[error("Notification are not supported by this issuer")]
+    NotificationsUnsupported,
 }
 
 pub struct Client<C>
@@ -57,6 +63,7 @@ where
     nonce_endpoint: Option<NonceUrl>,
     par_auth_url: Option<ParUrl>,
     deferred_credential_endpoint: Option<DeferredCredentialUrl>,
+    notification_endpoint: Option<NotificationUrl>,
     credential_response_encryption: Option<CredentialResponseEncryptionMetadata>,
     credential_configurations_supported: Vec<CredentialConfiguration<C::CredentialConfiguration>>,
     display: Option<Vec<CredentialIssuerMetadataDisplay>>,
@@ -101,6 +108,7 @@ where
             deferred_credential_endpoint: credential_issuer_metadata
                 .deferred_credential_endpoint()
                 .cloned(),
+            notification_endpoint: credential_issuer_metadata.notification_endpoint().cloned(),
             credential_response_encryption: credential_issuer_metadata
                 .credential_response_encryption()
                 .cloned(),
@@ -172,9 +180,23 @@ where
         &self,
         access_token: AccessToken,
         credential_id: credential::CredentialId,
-    ) -> credential::RequestBuilder {
-        let body = credential::Request::new(credential_id);
-        credential::RequestBuilder::new(body, self.credential_endpoint().clone(), access_token)
+    ) -> credential::RequestBuilder<Request> {
+        let body = Request::new(credential_id);
+        credential::RequestBuilder::new(body, self.credential_endpoint().to_string(), access_token)
+    }
+
+    pub fn request_deferred_credential(
+        &self,
+        access_token: AccessToken,
+        transaction_id: String,
+    ) -> Result<credential::RequestBuilder<DeferredRequest>, Error> {
+        let request = DeferredRequest::new(transaction_id);
+        self.deferred_credential_endpoint
+            .as_ref()
+            .map(|endpoint| {
+                credential::RequestBuilder::new(request, endpoint.to_string(), access_token)
+            })
+            .ok_or(Error::DeferredIssuanceUnsupported)
     }
 
     pub fn request_nonce(&self) -> Option<nonce::Request> {
@@ -183,6 +205,19 @@ where
         }
 
         None
+    }
+
+    pub fn send_notification(
+        &self,
+        access_token: AccessToken,
+        notification: NotificationRequest,
+    ) -> Result<NotificationRequestBuilder, Error> {
+        self.notification_endpoint
+            .as_ref()
+            .map(|endpoint| {
+                NotificationRequestBuilder::new(notification, endpoint.to_owned(), access_token)
+            })
+            .ok_or(Error::NotificationsUnsupported)
     }
 
     fn new_inner_client(
