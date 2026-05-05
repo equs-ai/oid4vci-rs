@@ -8,7 +8,7 @@ pub struct CredentialConfiguration {
     format: Format,
     vct: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    credential_signing_alg_values_supported: Vec<ssi_jwk::Algorithm>,
+    credential_signing_alg_values_supported: Vec<ssi::jwk::Algorithm>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     credential_metadata: Option<CredentialMetadata<CredentialMetadataDisplay>>,
 }
@@ -23,7 +23,7 @@ impl CredentialConfiguration {
 
     field_getters_setters![
         pub self [self] ["VC SD-JWT metadata value"] {
-            set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<ssi_jwk::Algorithm>],
+            set_credential_signing_alg_values_supported -> credential_signing_alg_values_supported[Vec<ssi::jwk::Algorithm>],
             set_vct -> vct[String],
             set_credential_metadata -> credential_metadata[Option<CredentialMetadata<CredentialMetadataDisplay>>],
         }
