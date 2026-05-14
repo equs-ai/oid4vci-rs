@@ -1,11 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use ssi_claims::{
+use ssi::claims::{
     jws::{self, Header},
     jwt,
 };
-use ssi_dids_core::DIDURLBuf;
-use ssi_jwk::{Algorithm, JWKResolver, JWK};
+use ssi::dids::DIDURLBuf;
+use ssi::jwk::{Algorithm, JWKResolver, JWK};
 use std::ops::{Add, Sub};
 use time::{Duration, OffsetDateTime};
 
@@ -13,7 +13,7 @@ use crate::types::Nonce;
 
 const JWS_TYPE: &str = "openid4vci-proof+jwt";
 
-pub type ProofSigningAlgValuesSupported = Vec<ssi_jwk::Algorithm>;
+pub type ProofSigningAlgValuesSupported = Vec<ssi::jwk::Algorithm>;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct KeyProofTypesSupported {
@@ -156,7 +156,7 @@ pub enum ConversionError {
     #[error(transparent)]
     SerializationError(#[from] serde_json::Error),
     #[error(transparent)]
-    SigningError(#[from] ssi_claims::jws::Error),
+    SigningError(#[from] ssi::claims::jws::Error),
     #[error("Unable to select JWT algorithm, please specify in JWK")]
     MissingJWKAlg,
 }
@@ -164,7 +164,7 @@ pub enum ConversionError {
 #[derive(thiserror::Error, Debug)]
 pub enum ParsingError {
     #[error(transparent)]
-    InvalidJWS(#[from] ssi_claims::jws::Error),
+    InvalidJWS(#[from] ssi::claims::jws::Error),
     #[error("JWS type header is invalid, expected `{expected}`, found `{actual}`")]
     InvalidJWSType { actual: String, expected: String },
     #[error("JWS does not specify an algorithm")]
@@ -178,11 +178,11 @@ pub enum ParsingError {
     #[error("Could not retrieve JWK from KID: {0}")]
     KIDDereferenceError(String),
     #[error(transparent)]
-    DIDDereferenceError(#[from] ssi_dids_core::resolution::Error),
+    DIDDereferenceError(#[from] ssi::dids::resolution::Error),
     #[error(transparent)]
-    InvalidDIDURL(#[from] ssi_dids_core::InvalidDIDURL<String>),
+    InvalidDIDURL(#[from] ssi::dids::InvalidDIDURL<String>),
     #[error(transparent)]
-    ProofValidationError(#[from] ssi_claims::ProofValidationError),
+    ProofValidationError(#[from] ssi::claims::ProofValidationError),
 }
 
 impl ProofOfPossession {
@@ -408,9 +408,9 @@ mod test {
     use did_method_key::DIDKey;
     use rstest::*;
     use serde_json::json;
-    use ssi_dids_core::{DIDResolver, VerificationMethodDIDResolver};
-    use ssi_jwk::JWK;
-    use ssi_verification_methods::AnyMethod;
+    use ssi::dids::{DIDResolver, VerificationMethodDIDResolver};
+    use ssi::jwk::JWK;
+    use ssi::verification_methods::AnyMethod;
 
     use super::*;
 
