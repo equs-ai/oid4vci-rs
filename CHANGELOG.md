@@ -42,6 +42,8 @@ before that point is not repeated here.
 - `ErrorType` variants updated.
 - HTTP client reworked for end-to-end tests.
 - `ssi` bumped to 0.16.0; `serde` pinned to 1.0.221.
+- `isomdl` moved from a git pin to the published 0.2.0, which also drops the
+  `cose-rs` git dependency. The crate now has no git dependencies.
 
 ### Removed
 
