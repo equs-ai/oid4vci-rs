@@ -142,7 +142,7 @@ impl CredentialOfferParameters {
         credential_issuer: IssuerUrl,
         credential_configuration_ids: Vec<CredentialConfigurationId>,
         grants: Option<CredentialOfferGrants>,
-        additional_fields: HashMap<String, Value>
+        additional_fields: HashMap<String, Value>,
     ) -> Self {
         Self {
             credential_issuer,
@@ -244,18 +244,13 @@ impl PreAuthorizedCodeGrant {
     ];
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
 pub enum InputMode {
     #[serde(rename = "numeric")]
+    #[default]
     Numeric,
     #[serde(rename = "text")]
     Text,
-}
-
-impl Default for InputMode {
-    fn default() -> Self {
-        Self::Numeric
-    }
 }
 
 #[serde_as]

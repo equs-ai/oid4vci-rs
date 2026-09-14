@@ -51,10 +51,12 @@ mod test {
         .await
         .unwrap();
 
-        let credential_issuer_metadata =
-            CredentialIssuerMetadata::discover_async(credential_offer.credential_issuer(), &http_client)
-                .await
-                .unwrap();
+        let credential_issuer_metadata = CredentialIssuerMetadata::discover_async(
+            credential_offer.credential_issuer(),
+            &http_client,
+        )
+        .await
+        .unwrap();
 
         let targeted_credentials: Vec<
             CredentialConfiguration<CoreProfilesCredentialConfiguration>,
@@ -71,7 +73,11 @@ mod test {
 
         assert_eq!(targeted_credentials.len(), 1);
 
-        let grant = credential_offer.grants().unwrap().pre_authorized_code().unwrap();
+        let grant = credential_offer
+            .grants()
+            .unwrap()
+            .pre_authorized_code()
+            .unwrap();
         let authorization_server = grant.authorization_server();
 
         let authorization_server_metadata =
