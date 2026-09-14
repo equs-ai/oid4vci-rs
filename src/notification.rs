@@ -1,11 +1,10 @@
 #![allow(clippy::type_complexity)]
 
-use crate::credential::{RequestError, Response};
-use crate::http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON};
-use crate::profiles::CredentialResponseProfile;
+use crate::credential::RequestError;
+use crate::http_utils::{auth_bearer, MIME_TYPE_JSON};
 use crate::types::NotificationUrl;
 use oauth2::http::header::{ACCEPT, CONTENT_TYPE};
-use oauth2::http::{HeaderValue, Method, StatusCode};
+use oauth2::http::{HeaderValue, Method};
 use oauth2::{
     http, AccessToken, AsyncHttpClient, ErrorResponseType, HttpRequest, HttpResponse,
     StandardErrorResponse, SyncHttpClient,
