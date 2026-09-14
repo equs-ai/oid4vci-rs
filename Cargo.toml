@@ -12,7 +12,7 @@ reqwest = ["oauth2/reqwest"]
 
 [dependencies]
 # TODO feature-gate
-isomdl = { git = "https://github.com/spruceid/isomdl", rev = "90ce218" }
+isomdl = "0.2.0"
 
 ssi = "=0.16.0"
 serde = { version = "=1.0.221", features = ["derive"] }
