@@ -1,18 +1,20 @@
 [package]
-name = "oid4vci"
+name = "equs-oid4vci"
 version = "0.1.0"
-authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0 OR MIT"
 description = "OpenID for Verifiable Credentials Issuance"
-repository = "https://github.com/spruceid/oidc4vci-rs/"
+repository = "https://github.com/equs-ai/oid4vci-rs"
+
+[lib]
+name = "oid4vci"
 
 [features]
 reqwest = ["oauth2/reqwest"]
 
 [dependencies]
 # TODO feature-gate
-isomdl = { git = "https://github.com/spruceid/isomdl", rev = "90ce218" }
+isomdl = "0.2.0"
 
 ssi = "=0.16.0"
 serde = { version = "=1.0.221", features = ["derive"] }
@@ -41,5 +43,5 @@ assert-json-diff = "2.0.2"
 did-jwk = "0.4"
 did-method-key = "0.5"
 tokio = { version = "1.25.0", features = ["macros"] }
-oid4vci = { path = ".", features = ["reqwest"] }
+equs-oid4vci = { path = ".", features = ["reqwest"] }
 rstest = "0.26.1"
