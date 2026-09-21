@@ -64,16 +64,12 @@ pub struct ClaimsPath(#[serde_as(deserialize_as = "DefaultOnNull")] pub Vec<Clai
 
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 #[serde(untagged)]
+#[derive(Default)]
 pub enum ClaimPathPointer {
     ElementKey(String),
     ElementIndex(usize),
+    #[default]
     AllElements,
-}
-
-impl Default for ClaimPathPointer {
-    fn default() -> Self {
-        ClaimPathPointer::AllElements
-    }
 }
 
 #[cfg(test)]

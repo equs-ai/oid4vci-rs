@@ -111,8 +111,8 @@ pub enum ProofOfPossessionNotBefore {
 impl ProofOfPossessionNotBefore {
     pub(crate) fn gen_relative_to(&self, issued_at: &OffsetDateTime) -> OffsetDateTime {
         match self {
-            ProofOfPossessionNotBefore::AsIssuedAt => issued_at.clone(),
-            ProofOfPossessionNotBefore::Fixed(fixed) => fixed.clone(),
+            ProofOfPossessionNotBefore::AsIssuedAt => *issued_at,
+            ProofOfPossessionNotBefore::Fixed(fixed) => *fixed,
             ProofOfPossessionNotBefore::Delay(delay) => issued_at.add(delay.to_owned()),
             ProofOfPossessionNotBefore::Leeway(leeway) => issued_at.sub(leeway.to_owned()),
         }

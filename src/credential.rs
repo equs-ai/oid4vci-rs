@@ -1,5 +1,3 @@
-use std::future::Future;
-use std::ops::Not;
 use oauth2::{
     http::{
         self,
@@ -10,13 +8,14 @@ use oauth2::{
     StandardErrorResponse, SyncHttpClient,
 };
 use serde::{Deserialize, Serialize};
+use std::future::Future;
+use std::ops::Not;
 
-use crate::credential_response_encryption::DeferredCredentialUrl;
 use crate::{
     credential_response_encryption::CredentialResponseEncryption,
     http_utils::{auth_bearer, content_type_has_essence, MIME_TYPE_JSON},
     profiles::CredentialResponseProfile,
-    types::{CredentialConfigurationId, CredentialIdentifier, CredentialUrl},
+    types::{CredentialConfigurationId, CredentialIdentifier},
 };
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -51,6 +50,10 @@ impl Proofs {
             Proofs::Jwt(proofs) => proofs.len(),
             Proofs::DiVp(proofs) => proofs.len(),
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -152,7 +155,10 @@ impl<B: Serialize> RequestBuilder<B> {
         RE: std::error::Error + 'static,
         CR: CredentialResponseProfile,
     {
-        if [StatusCode::OK, StatusCode::ACCEPTED].contains(&http_response.status()).not() {
+        if [StatusCode::OK, StatusCode::ACCEPTED]
+            .contains(&http_response.status())
+            .not()
+        {
             return Err(RequestError::Response(
                 http_response.status(),
                 http_response.body().to_owned(),
