@@ -13,3 +13,4 @@ diverged at `a802dfe`.
 ### Changed
 
 - Updated to OpenID4VCI 1.0.
+- Published as `equs-oid4vci`; the library target stays `oid4vci`, so `use oid4vci::…` is unchanged.
