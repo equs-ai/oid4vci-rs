@@ -5,6 +5,7 @@ edition = "2021"
 license = "Apache-2.0 OR MIT"
 description = "OpenID for Verifiable Credentials Issuance"
 repository = "https://github.com/equs-ai/oid4vci-rs"
+exclude = [".github/", ".gitignore", "**/.DS_Store"]
 
 [lib]
 name = "oid4vci"
